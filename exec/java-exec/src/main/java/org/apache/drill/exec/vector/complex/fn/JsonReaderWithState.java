@@ -20,7 +20,9 @@ package org.apache.drill.exec.vector.complex.fn;
 
 import java.io.IOException;
 import java.io.Reader;
+import java.util.List;
 
+import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.vector.complex.writer.BaseWriter.ComplexWriter;
 
 import com.fasterxml.jackson.core.JsonParseException;
@@ -35,10 +37,18 @@ public class JsonReaderWithState {
   private JsonRecordSplitter splitter;
   private JsonReader jsonReader;
 
-  public JsonReaderWithState(JsonRecordSplitter splitter) throws IOException{
+  public JsonReaderWithState(JsonRecordSplitter splitter, List<SchemaPath> columns) throws IOException {
     this.splitter = splitter;
     reader = splitter.getNextReader();
-    jsonReader = new JsonReader();
+    jsonReader = new JsonReader(columns);
+  }
+
+  public JsonReaderWithState(JsonRecordSplitter splitter) throws IOException{
+    this(splitter, null);
+  }
+
+  public List<SchemaPath> getNullColumns() {
+    return jsonReader.getNullColumns();
   }
 
   public WriteState write(ComplexWriter writer) throws JsonParseException, IOException {

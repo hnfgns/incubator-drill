@@ -23,11 +23,17 @@ import io.netty.buffer.UnpooledByteBufAllocator;
 
 import java.io.IOException;
 import java.io.Reader;
+import java.util.ArrayList;
+import java.util.List;
 
+import org.apache.drill.common.expression.PathSegment;
+import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.expr.holders.BigIntHolder;
 import org.apache.drill.exec.expr.holders.BitHolder;
 import org.apache.drill.exec.expr.holders.Float8Holder;
 import org.apache.drill.exec.expr.holders.VarCharHolder;
+import org.apache.drill.exec.record.MaterializedField;
+import org.apache.drill.exec.vector.complex.writer.BaseWriter;
 import org.apache.drill.exec.vector.complex.writer.BaseWriter.ComplexWriter;
 import org.apache.drill.exec.vector.complex.writer.BaseWriter.ListWriter;
 import org.apache.drill.exec.vector.complex.writer.BaseWriter.MapWriter;
@@ -48,10 +54,64 @@ public class JsonReader {
 
   private final JsonFactory factory = new JsonFactory();
   private JsonParser parser;
+  private List<SchemaPath> columns;
+  // This is a parallel array for the field above to indicate if we have found any values in a
+  // given selected column. This allows for columns that are requested to receive a vector full of
+  // null values if no values were found in an entire read. The reason this needs to happen after
+  // all of the records have been read in a batch is to prevent a schema change when we actually find
+  // data in that column.
+  private boolean[] columnsFound;
+  // A flag set at setup time if the start column is in the requested column list, prevents
+  // doing a more computational intensive check if we are supposed to be reading a column
+  private boolean starRequested;
 
-  public JsonReader() throws JsonParseException, IOException {
+  public JsonReader() throws IOException {
+    this(null);
+  }
+
+  public JsonReader(List<SchemaPath> columns) throws JsonParseException, IOException {
     factory.configure(Feature.ALLOW_UNQUOTED_FIELD_NAMES, true);
     factory.configure(Feature.ALLOW_COMMENTS, true);
+    this.columns = columns;
+    // TODO - remove this check once the optimizer is updated to push down * instead of a null list
+    if (this.columns == null) {
+      this.columns = new ArrayList();
+      this.columns.add(new SchemaPath(new PathSegment.NameSegment("*")));
+    }
+    this.columnsFound = new boolean[this.columns.size()];
+    this.starRequested = containsStar();
+  }
+
+  private boolean containsStar() {
+    for (SchemaPath expr : this.columns){
+      if (expr.getRootSegment().getPath().equals("*"))
+        return true;
+    }
+    return false;
+  }
+
+  private boolean fieldSelected(SchemaPath field){
+    if (starRequested)
+      return true;
+    int i = 0;
+    for (SchemaPath expr : this.columns){
+      if ( expr.contains(field)){
+        columnsFound[i] = true;
+        return true;
+      }
+      i++;
+    }
+    return false;
+  }
+
+  public List<SchemaPath> getNullColumns() {
+    ArrayList<SchemaPath> nullColumns = new ArrayList<SchemaPath>();
+    for (int i = 0; i < columnsFound.length; i++ ) {
+      if ( ! columnsFound[i] ) {
+        nullColumns.add(columns.get(i));
+      }
+    }
+    return nullColumns;
   }
 
   public boolean write(Reader reader, ComplexWriter writer) throws JsonParseException, IOException {
@@ -82,6 +142,33 @@ public class JsonReader {
     return true;
   }
 
+  private void consumeEntireNextValue(JsonParser parser) throws IOException {
+    switch(parser.nextToken()){
+      case START_ARRAY:
+      case START_OBJECT:
+        int arrayAndObjectCounter = 1;
+        skipArrayLoop: while (true) {
+          switch(parser.nextToken()) {
+            case START_ARRAY:
+            case START_OBJECT:
+              arrayAndObjectCounter++;
+              break;
+            case END_ARRAY:
+            case END_OBJECT:
+              arrayAndObjectCounter--;
+              if (arrayAndObjectCounter == 0) {
+                break skipArrayLoop;
+              }
+              break;
+          }
+        }
+        break;
+      default:
+        // hit a single value, do nothing as the token was already read
+        // in the switch statement
+        break;
+    }
+  }
 
   private void writeData(MapWriter map) throws JsonParseException, IOException {
     //
@@ -92,7 +179,16 @@ public class JsonReader {
 
       assert t == JsonToken.FIELD_NAME : String.format("Expected FIELD_NAME but got %s.", t.name());
       final String fieldName = parser.getText();
-
+      SchemaPath path;
+      if (map.getField().getPath().getRootSegment().getPath().equals("")) {
+        path = new SchemaPath(new PathSegment.NameSegment(fieldName));
+      } else {
+        path = map.getField().getPath().getChild(fieldName);
+      }
+      if ( ! fieldSelected(path) ) {
+        consumeEntireNextValue(parser);
+        continue outside;
+      }
 
       switch(parser.nextToken()){
       case START_ARRAY:
@@ -118,6 +214,7 @@ public class JsonReader {
         break;
       }
       case VALUE_NULL:
+        map.checkValueCapacity();
         // do nothing as we don't have a type.
         break;
       case VALUE_NUMBER_FLOAT:
@@ -132,14 +229,7 @@ public class JsonReader {
         break;
       case VALUE_STRING:
         VarCharHolder vh = new VarCharHolder();
-        String value = parser.getText();
-        byte[] b = value.getBytes(Charsets.UTF_8);
-        ByteBuf d = UnpooledByteBufAllocator.DEFAULT.buffer(b.length);
-        d.setBytes(0, b);
-        vh.buffer = d;
-        vh.start = 0;
-        vh.end = b.length;
-        map.varChar(fieldName).write(vh);
+        map.varChar(fieldName).write(prepareVarCharHolder(vh, parser));
         break;
 
       default:
@@ -150,6 +240,17 @@ public class JsonReader {
     }
     map.end();
 
+  }
+
+  private VarCharHolder prepareVarCharHolder(VarCharHolder vh, JsonParser parser) throws IOException {
+    String value = parser.getText();
+    byte[] b = value.getBytes(Charsets.UTF_8);
+    ByteBuf d = UnpooledByteBufAllocator.DEFAULT.buffer(b.length);
+    d.setBytes(0, b);
+    vh.buffer = d;
+    vh.start = 0;
+    vh.end = b.length;
+    return vh;
   }
 
   private void writeData(ListWriter list) throws JsonParseException, IOException {
@@ -195,14 +296,7 @@ public class JsonReader {
         break;
       case VALUE_STRING:
         VarCharHolder vh = new VarCharHolder();
-        String value = parser.getText();
-        byte[] b = value.getBytes(Charsets.UTF_8);
-        ByteBuf d = UnpooledByteBufAllocator.DEFAULT.buffer(b.length);
-        d.setBytes(0, b);
-        vh.buffer = d;
-        vh.start = 0;
-        vh.end = b.length;
-        list.varChar().write(vh);
+        list.varChar().write(prepareVarCharHolder(vh, parser));
         break;
       default:
         throw new IllegalStateException("Unexpected token " + parser.getCurrentToken());
