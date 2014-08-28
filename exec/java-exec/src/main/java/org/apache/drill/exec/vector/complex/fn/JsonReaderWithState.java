@@ -43,10 +43,6 @@ public class JsonReaderWithState {
     jsonReader = new JsonReader(columns);
   }
 
-  public JsonReaderWithState(JsonRecordSplitter splitter) throws IOException{
-    this(splitter, null);
-  }
-
   public List<SchemaPath> getNullColumns() {
     return jsonReader.getNullColumns();
   }

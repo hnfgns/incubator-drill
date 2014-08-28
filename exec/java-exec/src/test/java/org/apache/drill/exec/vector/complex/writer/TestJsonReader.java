@@ -33,6 +33,7 @@ import org.apache.drill.common.util.FileUtils;
 import org.apache.drill.exec.exception.SchemaChangeException;
 import org.apache.drill.exec.memory.BufferAllocator;
 import org.apache.drill.exec.memory.TopLevelAllocator;
+import org.apache.drill.exec.physical.base.GroupScan;
 import org.apache.drill.exec.proto.UserBitShared;
 import org.apache.drill.exec.record.RecordBatchLoader;
 import org.apache.drill.exec.record.VectorWrapper;
@@ -126,7 +127,7 @@ public class TestJsonReader extends BaseTestQuery {
     QueryResultBatch batch = results.get(0);
 
     assertTrue(batchLoader.load(batch.getHeader().getDef(), batch.getData()));
-    assertEquals(4, batchLoader.getSchema().getFieldCount());
+    assertEquals(3, batchLoader.getSchema().getFieldCount());
     testExistentColumns(batchLoader, batch);
 
     batch.release();
@@ -244,7 +245,8 @@ public class TestJsonReader extends BaseTestQuery {
     writer.allocate();
 
 
-    JsonReaderWithState jsonReader = new JsonReaderWithState(new ReaderJSONRecordSplitter(compound));
+    JsonReaderWithState jsonReader = new JsonReaderWithState(new ReaderJSONRecordSplitter(compound),
+        GroupScan.ALL_COLUMNS);
     int i =0;
     List<Integer> batchSizes = Lists.newArrayList();
 

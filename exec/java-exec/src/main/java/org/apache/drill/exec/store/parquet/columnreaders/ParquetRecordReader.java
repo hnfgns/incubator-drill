@@ -22,6 +22,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
+import com.google.common.base.Preconditions;
+import com.google.common.base.Predicate;
+import com.google.common.collect.Iterables;
 import org.apache.drill.common.exceptions.DrillRuntimeException;
 import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.common.expression.SchemaPath;
@@ -31,8 +34,10 @@ import org.apache.drill.common.types.TypeProtos.MajorType;
 import org.apache.drill.exec.exception.SchemaChangeException;
 import org.apache.drill.exec.expr.TypeHelper;
 import org.apache.drill.exec.ops.FragmentContext;
+import org.apache.drill.exec.physical.base.GroupScan;
 import org.apache.drill.exec.physical.impl.OutputMutator;
 import org.apache.drill.exec.record.MaterializedField;
+import org.apache.drill.exec.store.AbstractRecordReader;
 import org.apache.drill.exec.store.RecordReader;
 import org.apache.drill.exec.vector.ValueVector;
 import org.apache.drill.exec.vector.RepeatedFixedWidthVector;
@@ -50,7 +55,7 @@ import parquet.hadoop.metadata.ColumnChunkMetaData;
 import parquet.hadoop.metadata.ParquetMetadata;
 import parquet.schema.PrimitiveType;
 
-public class ParquetRecordReader implements RecordReader {
+public class ParquetRecordReader extends AbstractRecordReader {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(ParquetRecordReader.class);
 
   // this value has been inflated to read in multiple value vectors at once, and then break them up into smaller vectors
@@ -81,7 +86,6 @@ public class ParquetRecordReader implements RecordReader {
   Path hadoopPath;
   private VarLenBinaryReader varLengthReader;
   private ParquetMetadata footer;
-  private List<SchemaPath> columns;
   private final CodecFactoryExposer codecFactoryExposer;
   int rowGroupIndex;
 
@@ -100,13 +104,13 @@ public class ParquetRecordReader implements RecordReader {
                              String path, int rowGroupIndex, FileSystem fs,
                              CodecFactoryExposer codecFactoryExposer, ParquetMetadata footer,
                              List<SchemaPath> columns) throws ExecutionSetupException {
-    hadoopPath = new Path(path);
-    fileSystem = fs;
+    this.hadoopPath = new Path(path);
+    this.fileSystem = fs;
     this.codecFactoryExposer = codecFactoryExposer;
     this.rowGroupIndex = rowGroupIndex;
     this.batchSize = batchSize;
     this.footer = footer;
-    this.columns = columns;
+    setColumns(columns);
   }
 
   public CodecFactoryExposer getCodecFactoryExposer() {
@@ -155,15 +159,16 @@ public class ParquetRecordReader implements RecordReader {
     // TODO - not sure if this is how we want to represent this
     // for now it makes the existing tests pass, simply selecting
     // all available data if no columns are provided
-    if (this.columns != null){
-      for (SchemaPath expr : this.columns){
-        if ( field.matches(expr)){
-          return true;
-        }
-      }
-      return false;
+    if (isStarQuery()) {
+      return true;
     }
-    return true;
+
+    for (SchemaPath expr : getColumns()){
+      if ( field.matches(expr)){
+        return true;
+      }
+    }
+    return false;
   }
 
   @Override

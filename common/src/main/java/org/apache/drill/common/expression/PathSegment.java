@@ -264,7 +264,7 @@ public abstract class PathSegment{
       return true;
     if (otherSeg == null)
       return false;
-    if (otherSeg instanceof ArraySegment)
+    if (isArray() || otherSeg.isArray())
       return true;
     if (getClass() != otherSeg.getClass())
       return false;

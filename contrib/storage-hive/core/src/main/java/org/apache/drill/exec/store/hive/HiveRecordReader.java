@@ -36,6 +36,7 @@ import org.apache.drill.exec.expr.TypeHelper;
 import org.apache.drill.exec.ops.FragmentContext;
 import org.apache.drill.exec.physical.impl.OutputMutator;
 import org.apache.drill.exec.record.MaterializedField;
+import org.apache.drill.exec.store.AbstractRecordReader;
 import org.apache.drill.exec.store.RecordReader;
 import org.apache.drill.exec.vector.BigIntVector;
 import org.apache.drill.exec.vector.BitVector;
@@ -77,13 +78,12 @@ import org.joda.time.DateTimeZone;
 
 import com.google.common.collect.Lists;
 
-public class HiveRecordReader implements RecordReader {
+public class HiveRecordReader extends AbstractRecordReader {
 
   protected Table table;
   protected Partition partition;
   protected InputSplit inputSplit;
   protected FragmentContext context;
-  protected List<SchemaPath> projectedColumns;
   protected List<String> selectedColumnNames;
   protected List<TypeInfo> selectedColumnTypes = Lists.newArrayList();
   protected List<ObjectInspector> selectedColumnObjInspectors = Lists.newArrayList();
@@ -111,9 +111,9 @@ public class HiveRecordReader implements RecordReader {
     this.partition = partition;
     this.inputSplit = inputSplit;
     this.context = context;
-    this.projectedColumns = projectedColumns;
     this.empty = (inputSplit == null && partition == null);
     this.hiveConfigOverride = hiveConfigOverride;
+    setColumns(projectedColumns);
     init();
   }
 
@@ -166,14 +166,14 @@ public class HiveRecordReader implements RecordReader {
       }
       sInspector = (StructObjectInspector) oi;
       StructTypeInfo sTypeInfo = (StructTypeInfo) TypeInfoUtils.getTypeInfoFromObjectInspector(sInspector);
-      if (projectedColumns == null) {
+      if (isStarQuery()) {
         selectedColumnNames = sTypeInfo.getAllStructFieldNames();
         tableColumns = selectedColumnNames;
       } else {
         tableColumns = sTypeInfo.getAllStructFieldNames();
         List<Integer> columnIds = Lists.newArrayList();
         selectedColumnNames = Lists.newArrayList();
-        for (SchemaPath field : projectedColumns) {
+        for (SchemaPath field : getColumns()) {
           String columnName = field.getRootSegment().getPath();
           if (!tableColumns.contains(columnName)) {
             if (partitionNames.contains(columnName)) {
@@ -199,7 +199,7 @@ public class HiveRecordReader implements RecordReader {
         selectedColumnFieldConverters.add(HiveFieldConverter.create(typeInfo));
       }
 
-      if (projectedColumns == null) {
+      if (isStarQuery()) {
         selectedPartitionNames = partitionNames;
       }
 

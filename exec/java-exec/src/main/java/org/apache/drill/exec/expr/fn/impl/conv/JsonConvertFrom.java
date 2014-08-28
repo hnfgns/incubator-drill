@@ -67,7 +67,8 @@ public class JsonConvertFrom {
         jsonReader.write(new java.io.StringReader(input), writer);
         
       } catch (Exception e) {
-        System.out.println(" msg = " + e.getMessage() + " trace : " + e.getStackTrace());
+        System.out.println(" error while converting from JSON. Message " + e.getMessage());
+        e.printStackTrace();
       }
     }
   }
