@@ -42,7 +42,7 @@ abstract class AbstractWriter<V extends ValueVector> implements PojoWriter{
     MaterializedField mf = MaterializedField.create(field.getName(), type);
     @SuppressWarnings("unchecked")
     Class<V> valueVectorClass = (Class<V>) TypeHelper.getValueVectorClass(type.getMinorType(), type.getMode());
-    this.vector = output.addField(mf, valueVectorClass);
+    this.vector = output.addOrGetField(mf, valueVectorClass);
   }
 
   @Override

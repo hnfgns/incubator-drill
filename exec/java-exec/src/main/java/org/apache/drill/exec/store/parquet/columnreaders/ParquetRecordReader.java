@@ -283,7 +283,7 @@ public class ParquetRecordReader extends AbstractRecordReader {
         }
 
         fieldFixedLength = column.getType() != PrimitiveType.PrimitiveTypeName.BINARY;
-        v = output.addField(field, (Class<? extends ValueVector>) TypeHelper.getValueVectorClass(type.getMinorType(), type.getMode()));
+        v = output.addOrGetField(field, (Class<? extends ValueVector>) TypeHelper.getValueVectorClass(type.getMinorType(), type.getMode()));
         if (column.getType() != PrimitiveType.PrimitiveTypeName.BINARY) {
           if (column.getMaxRepetitionLevel() > 0) {
             ColumnReader dataReader = ColumnReaderFactory.createFixedColumnReader(this, fieldFixedLength,
@@ -311,7 +311,7 @@ public class ParquetRecordReader extends AbstractRecordReader {
           col = projectedColumns.get(i);
           assert col!=null;
           if ( ! columnsFound[i] && !col.equals(STAR_COLUMN)) {
-            nullFilledVectors.add((NullableBitVector)output.addField(MaterializedField.create(col,
+            nullFilledVectors.add((NullableBitVector)output.addOrGetField(MaterializedField.create(col,
                     Types.optional(TypeProtos.MinorType.BIT)),
                 (Class<? extends ValueVector>) TypeHelper.getValueVectorClass(TypeProtos.MinorType.BIT, DataMode.OPTIONAL)));
 

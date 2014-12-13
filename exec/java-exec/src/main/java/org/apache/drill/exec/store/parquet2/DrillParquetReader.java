@@ -59,17 +59,14 @@ import parquet.hadoop.metadata.ColumnChunkMetaData;
 import parquet.hadoop.metadata.ColumnPath;
 import parquet.hadoop.metadata.ParquetMetadata;
 import parquet.io.ColumnIOFactory;
-import parquet.io.InvalidRecordException;
 import parquet.io.MessageColumnIO;
 import parquet.schema.GroupType;
 import parquet.schema.MessageType;
 import parquet.schema.Type;
-import parquet.schema.PrimitiveType;
 
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-import parquet.schema.Types;
 
 public class DrillParquetReader extends AbstractRecordReader {
 
@@ -221,10 +218,10 @@ public class DrillParquetReader extends AbstractRecordReader {
           nullFilledVectors = new ArrayList();
           for(SchemaPath col: columnsNotFound){
             nullFilledVectors.add(
-              (NullableBitVector)output.addField(MaterializedField.create(col,
-                  org.apache.drill.common.types.Types.optional(TypeProtos.MinorType.BIT)),
-                (Class<? extends ValueVector>) TypeHelper.getValueVectorClass(TypeProtos.MinorType.BIT,
-                  TypeProtos.DataMode.OPTIONAL)));
+              (NullableBitVector)output.addOrGetField(MaterializedField.create(col,
+                      org.apache.drill.common.types.Types.optional(TypeProtos.MinorType.BIT)),
+                  (Class<? extends ValueVector>) TypeHelper.getValueVectorClass(TypeProtos.MinorType.BIT,
+                      TypeProtos.DataMode.OPTIONAL)));
           }
           if(columnsNotFound.size()==getColumns().size()){
             noColumnsFound=true;

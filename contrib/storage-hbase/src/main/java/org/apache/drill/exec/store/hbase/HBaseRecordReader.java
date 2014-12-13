@@ -145,7 +145,7 @@ public class HBaseRecordReader extends AbstractRecordReader implements DrillHBas
       for (SchemaPath column : getColumns()) {
         if (column.equals(ROW_KEY_PATH)) {
           MaterializedField field = MaterializedField.create(column, ROW_KEY_TYPE);
-          rowKeyVector = outputMutator.addField(field, VarBinaryVector.class);
+          rowKeyVector = outputMutator.addOrGetField(field, VarBinaryVector.class);
         } else {
           getOrCreateFamilyVector(column.getRootSegment().getPath(), false);
         }
@@ -239,7 +239,7 @@ public class HBaseRecordReader extends AbstractRecordReader implements DrillHBas
       if(v == null) {
         SchemaPath column = SchemaPath.getSimplePath(familyName);
         MaterializedField field = MaterializedField.create(column, COLUMN_FAMILY_TYPE);
-        v = outputMutator.addField(field, MapVector.class);
+        v = outputMutator.addOrGetField(field, MapVector.class);
         if (allocateOnCreate) {
           v.allocateNew();
         }

@@ -22,7 +22,6 @@ import com.google.common.primitives.Ints;
 
 import io.netty.buffer.DrillBuf;
 
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -34,6 +33,7 @@ import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.common.types.TypeProtos.DataMode;
 import org.apache.drill.common.types.TypeProtos.MajorType;
 import org.apache.drill.common.types.TypeProtos.MinorType;
+import org.apache.drill.common.util.TransformingMap;
 import org.apache.drill.exec.expr.TypeHelper;
 import org.apache.drill.exec.expr.holders.ComplexHolder;
 import org.apache.drill.exec.memory.BufferAllocator;
@@ -58,8 +58,8 @@ public class MapVector extends AbstractContainerVector {
 
   public final static MajorType TYPE = MajorType.newBuilder().setMinorType(MinorType.MAP).setMode(DataMode.REQUIRED).build();
 
-  final HashMap<String, ValueVector> vectors = Maps.newLinkedHashMap();
-  private final Map<String, VectorWithOrdinal> vectorIds = Maps.newHashMap();
+  private final Map<String, ValueVector> vectors = new TransformingMap(Maps.newLinkedHashMap(), TransformingMap.STRING_LOWERCASE);
+  private final Map<String, VectorWithOrdinal> vectorIds = new TransformingMap(Maps.newHashMap(), TransformingMap.STRING_LOWERCASE);
   private final IntObjectOpenHashMap<ValueVector> vectorsById = new IntObjectOpenHashMap<>();
   private final SingleMapReaderImpl reader = new SingleMapReaderImpl(MapVector.this);
   private final Accessor accessor = new Accessor();
@@ -119,8 +119,9 @@ public class MapVector extends AbstractContainerVector {
 
   @Override
   public <T extends ValueVector> T addOrGet(String name, MajorType type, Class<T> clazz) {
-    while (true) {
-      ValueVector vector = vectors.get(name);
+    ValueVector vector = null;
+    for (int i=0; i<2; i++) {
+      vector = vectors.get(name);
       if (vector == null) {
         vector = TypeHelper.getNewVector(field.getPath(), name, allocator, type);
         Preconditions.checkNotNull(vector, String.format("Failure to create vector of type %s.", type));
@@ -130,31 +131,38 @@ public class MapVector extends AbstractContainerVector {
         }
       }
       if (clazz.isAssignableFrom(vector.getClass())) {
-        return (T)vector;
-      } else {
-        boolean allNulls = true;
-        for (int i=0; i<vector.getAccessor().getValueCount(); i++) {
-          if (!vector.getAccessor().isNull(i)) {
-            allNulls = false;
-            break;
-          }
-        }
-        if (allNulls) {
-          vector.clear();
-          vectors.remove(name);
-        } else {
-          throw new IllegalStateException(String.format("Vector requested [%s] was different than type stored [%s].  Drill doesn't yet support hetergenous types.", clazz.getSimpleName(), vector.getClass().getSimpleName()));
+        break;
+      }
+
+      boolean allNulls = true;
+      for (int j = 0; j < vector.getAccessor().getValueCount(); j++) {
+        if (!vector.getAccessor().isNull(j)) {
+          allNulls = false;
+          break;
         }
       }
+
+      if (!allNulls) {
+        throw new IllegalStateException(String.format("Vector requested [%s] was different than type stored [%s].  Drill doesn't yet support hetergenous types.", clazz.getSimpleName(), vector.getClass().getSimpleName()));
+      }
+
+      vector.clear();
+      vectors.remove(name);
+      VectorWithOrdinal old = vectorIds.remove(name);
+      if (old != null) {
+        vectorsById.remove(old.ordinal);
+      }
     }
+    return (T) vector;
   }
 
   protected void put(String name, ValueVector vv) {
     int ordinal = vectors.size();
-    if (vectors.put(name, vv) != null) {
+    ValueVector old = vectors.put(name, vv);
+    if (old != null) {
       throw new IllegalStateException();
     }
-    vectorIds.put(name.toLowerCase(), new VectorWithOrdinal(vv, ordinal));
+    vectorIds.put(name, new VectorWithOrdinal(vv, ordinal));
     vectorsById.put(ordinal, vv);
     field.addChild(vv.getField());
   }
@@ -462,7 +470,7 @@ public class MapVector extends AbstractContainerVector {
 
   @Override
   public VectorWithOrdinal getVectorWithOrdinal(String name) {
-    return vectorIds.get(name.toLowerCase());
+    return vectorIds.get(name);
   }
 
 }

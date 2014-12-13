@@ -21,16 +21,21 @@ package org.apache.drill.exec.vector;
 import org.apache.drill.exec.util.CallBack;
 
 public class SchemaChangeCallBack implements CallBack {
-  private boolean schemaChange = false;
+  private boolean schemaChanged = false;
 
   public void doWork() {
-    schemaChange = true;
+    // TODO: rename this method to make it more understandable.
+    schemaChanged = true;
   }
 
-  public boolean getSchemaChange() {
-    boolean schemaChange = this.schemaChange;
-    this.schemaChange = false;
-    return schemaChange;
+  public boolean getAndResetSchemaChanged() {
+    boolean result = schemaChanged;
+    reset();
+    return result;
+  }
+
+  public void reset() {
+    schemaChanged = false;
   }
 }
 

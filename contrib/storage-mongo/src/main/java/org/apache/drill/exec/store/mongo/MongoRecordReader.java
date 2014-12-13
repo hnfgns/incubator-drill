@@ -17,7 +17,6 @@
  */
 package org.apache.drill.exec.store.mongo;
 
-import java.io.IOException;
 import java.net.UnknownHostException;
 import java.util.Collection;
 import java.util.Iterator;
@@ -29,7 +28,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.drill.common.exceptions.DrillRuntimeException;
 import org.apache.drill.common.exceptions.ExecutionSetupException;
-import org.apache.drill.common.expression.PathSegment;
 import org.apache.drill.common.expression.PathSegment.NameSegment;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.common.types.TypeProtos.MinorType;
@@ -44,7 +42,6 @@ import org.apache.drill.exec.store.AbstractRecordReader;
 import org.apache.drill.exec.vector.NullableVarCharVector;
 import org.apache.drill.exec.vector.complex.fn.JsonReader;
 import org.apache.drill.exec.vector.complex.impl.VectorContainerWriter;
-import org.apache.drill.exec.vector.complex.writer.BaseWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -167,7 +164,7 @@ public class MongoRecordReader extends AbstractRecordReader {
         SchemaPath startColumn = SchemaPath.getSimplePath("*");
         MaterializedField field = MaterializedField.create(startColumn,
             Types.optional(MinorType.VARCHAR));
-        valueVector = output.addField(field, NullableVarCharVector.class);
+        valueVector = output.addOrGetField(field, NullableVarCharVector.class);
       } catch (SchemaChangeException e) {
         throw new ExecutionSetupException(e);
       }

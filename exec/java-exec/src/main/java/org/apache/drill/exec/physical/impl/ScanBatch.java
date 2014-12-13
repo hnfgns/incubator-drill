@@ -47,7 +47,6 @@ import org.apache.drill.exec.record.WritableBatch;
 import org.apache.drill.exec.record.selection.SelectionVector2;
 import org.apache.drill.exec.record.selection.SelectionVector4;
 import org.apache.drill.exec.store.RecordReader;
-import org.apache.drill.exec.util.CallBack;
 import org.apache.drill.exec.vector.AllocationHelper;
 import org.apache.drill.exec.vector.NullableVarCharVector;
 import org.apache.drill.exec.vector.SchemaChangeCallBack;
@@ -82,7 +81,7 @@ public class ScanBatch implements RecordBatch {
   private String partitionColumnDesignator;
   private boolean first = true;
   private boolean done = false;
-  private SchemaChangeCallBack callBack = new SchemaChangeCallBack();
+  private SchemaChangeCallBack schemaState = new SchemaChangeCallBack();
 
   public ScanBatch(PhysicalOperator subScanConfig, FragmentContext context, Iterator<RecordReader> readers, List<String[]> partitionColumns, List<Integer> selectedPartitionColumns) throws ExecutionSetupException {
     this.context = context;
@@ -217,7 +216,7 @@ public class ScanBatch implements RecordBatch {
       partitionVectors = Lists.newArrayList();
       for (int i : selectedPartitionColumns) {
         MaterializedField field = MaterializedField.create(SchemaPath.getSimplePath(partitionColumnDesignator + i), Types.optional(MinorType.VARCHAR));
-        ValueVector v = mutator.addField(field, NullableVarCharVector.class);
+        ValueVector v = mutator.addOrGetField(field, NullableVarCharVector.class);
         partitionVectors.add(v);
       }
     } catch(SchemaChangeException e) {
@@ -272,15 +271,15 @@ public class ScanBatch implements RecordBatch {
 
     @SuppressWarnings("unchecked")
     @Override
-    public <T extends ValueVector> T addField(MaterializedField field, Class<T> clazz) throws SchemaChangeException {
+    public <T extends ValueVector> T addOrGetField(MaterializedField field, Class<T> clazz) throws SchemaChangeException {
       // Check if the field exists
       ValueVector v = fieldVectorMap.get(field.key());
 
-      if (v == null || v.getClass() != clazz) {
+      if (v == null || !clazz.isAssignableFrom(v.getClass())) {
         // Field does not exist add it to the map and the output container
-        v = TypeHelper.getNewVector(field, oContext.getAllocator(), callBack);
+        v = TypeHelper.getNewVector(field, oContext.getAllocator(), schemaState);
         if (!clazz.isAssignableFrom(v.getClass())) {
-          throw new SchemaChangeException(String.format("The class that was provided %s does not correspond to the expected vector type of %s.", clazz.getSimpleName(), v.getClass().getSimpleName()));
+          throw new SchemaChangeException(String.format("Expecting a vector type of %s but got %s instead.", clazz.getSimpleName(), v.getClass().getSimpleName()));
         }
         container.add(v);
 
@@ -291,7 +290,7 @@ public class ScanBatch implements RecordBatch {
         }
 
         // Adding new vectors to the container mark that the schema has changed
-        schemaChange = true;
+        schemaState.doWork();
       }
 
       return (T) v;
@@ -307,8 +306,9 @@ public class ScanBatch implements RecordBatch {
     @Override
     public boolean isNewSchema() {
       // Check if top level schema has changed, second condition checks if one of the deeper map schema has changed
-      if (schemaChange == true || callBack.getSchemaChange()) {
+      if (schemaChange == true || schemaState.getAndResetSchemaChanged()) {
         schemaChange = false;
+        schemaState.reset();
         return true;
       }
       return false;

@@ -191,9 +191,9 @@ public class RepeatedMapVector extends AbstractContainerVector implements Repeat
       pairs = new TransferPair[vectors.size()];
       int i =0;
       for (Map.Entry<String, ValueVector> e : vectors.entrySet()) {
-        int preSize = to.vectors.size();
+        int preSize = to.size();
         ValueVector v = to.addOrGet(e.getKey(), e.getValue().getField().getType(), e.getValue().getClass());
-        if (to.vectors.size() != preSize) {
+        if (to.size() != preSize) {
           v.allocateNew();
         }
         pairs[i++] = e.getValue().makeTransferPair(v);
@@ -264,9 +264,9 @@ public class RepeatedMapVector extends AbstractContainerVector implements Repeat
       pairs = new TransferPair[vectors.size()];
       int i =0;
       for (Map.Entry<String, ValueVector> e : vectors.entrySet()) {
-        int preSize = to.vectors.size();
+        int preSize = to.size();
         ValueVector v = to.addOrGet(e.getKey(), e.getValue().getField().getType(), e.getValue().getClass());
-        if (to.vectors.size() != preSize) {
+        if (to.size() != preSize) {
           v.allocateNew();
         }
         pairs[i++] = e.getValue().makeTransferPair(v);

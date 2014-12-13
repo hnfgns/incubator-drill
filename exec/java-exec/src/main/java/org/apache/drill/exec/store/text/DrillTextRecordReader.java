@@ -18,7 +18,6 @@
 package org.apache.drill.exec.store.text;
 
 import java.io.IOException;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
@@ -130,7 +129,7 @@ public class DrillTextRecordReader extends AbstractRecordReader {
   public void setup(OutputMutator output) throws ExecutionSetupException {
     MaterializedField field = MaterializedField.create(ref, Types.repeated(TypeProtos.MinorType.VARCHAR));
     try {
-      vector = output.addField(field, RepeatedVarCharVector.class);
+      vector = output.addOrGetField(field, RepeatedVarCharVector.class);
     } catch (SchemaChangeException e) {
       throw new ExecutionSetupException(e);
     }

@@ -104,7 +104,7 @@ public abstract class AbstractSingleRecordBatch<T extends PhysicalOperator> exte
       }
 
       // Check if schema has changed
-      if (callBack.getSchemaChange()) {
+      if (callBack.getAndResetSchemaChanged()) {
         return IterOutcome.OK_NEW_SCHEMA;
       }
 

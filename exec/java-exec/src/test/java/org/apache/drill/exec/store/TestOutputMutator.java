@@ -78,7 +78,7 @@ public class TestOutputMutator implements OutputMutator, Iterable<VectorWrapper<
   }
 
   @Override
-  public <T extends ValueVector> T addField(MaterializedField field, Class<T> clazz) throws SchemaChangeException {
+  public <T extends ValueVector> T addOrGetField(MaterializedField field, Class<T> clazz) throws SchemaChangeException {
     ValueVector v = TypeHelper.getNewVector(field, allocator);
     if (!clazz.isAssignableFrom(v.getClass())) {
       throw new SchemaChangeException(String.format("The class that was provided %s does not correspond to the expected vector type of %s.", clazz.getSimpleName(), v.getClass().getSimpleName()));

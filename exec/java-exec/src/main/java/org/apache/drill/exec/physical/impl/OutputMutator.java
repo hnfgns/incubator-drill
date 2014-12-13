@@ -47,7 +47,7 @@ public interface OutputMutator {
    * @throws SchemaChangeException
    *           If the addition of this field is incompatible with this OutputMutator's capabilities.
    */
-  public <T extends ValueVector> T addField(MaterializedField field, Class<T> clazz) throws SchemaChangeException;
+  public <T extends ValueVector> T addOrGetField(MaterializedField field, Class<T> clazz) throws SchemaChangeException;
 
   public void allocate(int recordCount);
 

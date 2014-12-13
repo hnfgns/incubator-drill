@@ -332,7 +332,7 @@ public class ParquetRecordReaderTest extends BaseTestQuery{
     }
 
     @Override
-    public <T extends ValueVector> T addField(MaterializedField field, Class<T> clazz) throws SchemaChangeException {
+    public <T extends ValueVector> T addOrGetField(MaterializedField field, Class<T> clazz) throws SchemaChangeException {
       return null;
     }
 

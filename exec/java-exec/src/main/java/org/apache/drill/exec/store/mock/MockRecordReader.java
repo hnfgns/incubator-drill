@@ -93,7 +93,7 @@ public class MockRecordReader extends AbstractRecordReader {
         MajorType type = config.getTypes()[i].getMajorType();
         MaterializedField field = getVector(config.getTypes()[i].getName(), type, batchRecordCount);
         Class vvClass = TypeHelper.getValueVectorClass(field.getType().getMinorType(), field.getDataMode());
-        valueVectors[i] = output.addField(field, vvClass);
+        valueVectors[i] = output.addOrGetField(field, vvClass);
       }
     } catch (SchemaChangeException e) {
       throw new ExecutionSetupException("Failure while setting up fields", e);
