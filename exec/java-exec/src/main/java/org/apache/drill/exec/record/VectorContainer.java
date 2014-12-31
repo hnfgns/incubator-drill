@@ -54,16 +54,6 @@ public class VectorContainer extends AbstractMapVector implements Iterable<Vecto
     this.oContext = oContext;
   }
 
-  // public VectorContainer(List<ValueVector> vectors, List<ValueVector[]> hyperVectors) {
-  // assert !vectors.isEmpty() || !hyperVectors.isEmpty();
-  //
-  // addCollection(vectors);
-  //
-  // for (ValueVector[] vArr : hyperVectors) {
-  // add(vArr);
-  // }
-  // }
-
   public boolean isSchemaChanged() {
     return schemaChanged;
   }

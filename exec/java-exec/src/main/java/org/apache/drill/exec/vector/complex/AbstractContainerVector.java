@@ -17,33 +17,182 @@
  */
 package org.apache.drill.exec.vector.complex;
 
+import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
 
+import javax.annotation.Nullable;
+
+import com.google.common.base.Function;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
+import io.netty.buffer.DrillBuf;
+import org.apache.drill.common.collections.MapWithOrdinal;
 import org.apache.drill.common.expression.PathSegment;
 import org.apache.drill.common.types.TypeProtos.DataMode;
 import org.apache.drill.common.types.TypeProtos.MajorType;
 import org.apache.drill.common.types.TypeProtos.MinorType;
+import org.apache.drill.exec.expr.TypeHelper;
+import org.apache.drill.exec.memory.BufferAllocator;
+import org.apache.drill.exec.memory.OutOfMemoryRuntimeException;
+import org.apache.drill.exec.record.MaterializedField;
 import org.apache.drill.exec.record.TypedFieldId;
+import org.apache.drill.exec.util.CallBack;
 import org.apache.drill.exec.vector.ValueVector;
 
-public abstract class AbstractContainerVector implements ValueVector{
+public abstract class AbstractContainerVector implements ValueVector {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(AbstractContainerVector.class);
 
-  public abstract <T extends ValueVector> T addOrGet(String name, MajorType type, Class<T> clazz);
-  public abstract <T extends ValueVector> T get(String name, Class<T> clazz);
-  public abstract int size();
+  private final MapWithOrdinal<String, ValueVector> vectors =  new MapWithOrdinal<>();
+  private final MaterializedField field;
+  protected final BufferAllocator allocator;
+  protected final CallBack callBack;
+
+  protected AbstractContainerVector(MaterializedField field, BufferAllocator allocator, CallBack callBack) {
+    this.field = Preconditions.checkNotNull(field);
+    this.allocator = allocator;
+    this.callBack = callBack;
+  }
+
+  @Override
+  public void allocateNew() throws OutOfMemoryRuntimeException {
+    if (!allocateNewSafe()) {
+      throw new OutOfMemoryRuntimeException();
+    }
+  }
+
+  @Override
+  public boolean allocateNewSafe() {
+    for (ValueVector v : vectors.values()) {
+      if (!v.allocateNewSafe()) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  @Override
+  public MaterializedField getField() {
+    return field;
+  }
+
+  public <T extends ValueVector> T addOrGet(String name, MajorType type, Class<T> clazz) {
+    boolean replace = false;
+    for (int i=0; i<2; i++) {
+      ValueVector vector = getVector(name);
+      if (replace || vector == null) {
+        vector = TypeHelper.getNewVector(field.getPath(), name, allocator, type);
+        Preconditions.checkNotNull(vector, String.format("Failure to create vector of type %s.", type));
+        putVector(name, vector);
+        if (callBack != null) {
+          callBack.doWork();
+        }
+      }
+      if (clazz.isAssignableFrom(vector.getClass())) {
+        return (T)vector;
+      }
+      boolean allNulls = true;
+      for (int r=0; r<vector.getAccessor().getValueCount(); r++) {
+        if (!vector.getAccessor().isNull(r)) {
+          allNulls = false;
+          break;
+        }
+      }
+      if (!allNulls) {
+        throw new IllegalStateException(String.format("Vector requested [%s] was different than type stored [%s].  Drill doesn't yet support hetergenous types.", clazz.getSimpleName(), vector.getClass().getSimpleName()));
+      }
+      vector.clear();
+      replace = true;
+    }
+    throw new IllegalStateException(String.format("Unable to create vector[%s] of desired type[%s -- %s].", name, type, clazz.getSimpleName()));
+  }
+
+  public ValueVector getVectorByOrdinal(int id) {
+    return vectors.getByOrdinal(id);
+  }
+
+  public ValueVector getVector(String name) {
+    return getVector(name, ValueVector.class);
+  }
+
+  public <T extends ValueVector> T getVector(String name, Class<T> clazz) {
+    ValueVector v = vectors.get(name.toLowerCase());
+    if (v == null) {
+      return null;
+    }
+    return typeify(v, clazz);
+  }
+
+  protected void putVector(String name, ValueVector vector) {
+    ValueVector old = vectors.put(name.toLowerCase(), vector);
+    if (old != null && old != vector) {
+      logger.debug("Field [%s] mutated from [%s] to [%s]", name, old.getClass().getSimpleName(),
+          vector.getClass().getSimpleName());
+    }
+
+    field.addChild(vector.getField());
+  }
+
+  protected Collection<String> getChildFieldNames() {
+    return Sets.newLinkedHashSet(Iterables.transform(field.getChildren(), new Function<MaterializedField, String>() {
+      @Nullable
+      @Override
+      public String apply(MaterializedField field) {
+        return Preconditions.checkNotNull(field).getLastName();
+      }
+    }));
+  }
+
+  protected Collection<ValueVector> getVectors() {
+    return vectors.values();
+  }
+
+  public int size() {
+    return vectors.size();
+  }
+
+ @Override
+  public void close() {
+    for (ValueVector v : this) {
+      v.close();
+    }
+  }
+
+  @Override
+  public Iterator<ValueVector> iterator() {
+    return vectors.values().iterator();
+  }
 
   protected <T extends ValueVector> T typeify(ValueVector v, Class<T> clazz) {
     if (clazz.isAssignableFrom(v.getClass())) {
       return (T) v;
-    } else {
-      throw new IllegalStateException(String.format("Vector requested [%s] was different than type stored [%s].  Drill doesn't yet support hetergenous types.", clazz.getSimpleName(), v.getClass().getSimpleName()));
     }
+    throw new IllegalStateException(String.format("Vector requested [%s] was different than type stored [%s].  Drill doesn't yet support hetergenous types.", clazz.getSimpleName(), v.getClass().getSimpleName()));
   }
 
-  public abstract List<ValueVector> getPrimitiveVectors();
+  public List<ValueVector> getPrimitiveVectors() {
+    List<ValueVector> primitiveVectors = Lists.newArrayList();
+    for (ValueVector v : vectors.values()) {
+      if (v instanceof AbstractContainerVector) {
+        AbstractContainerVector av = (AbstractContainerVector) v;
+        primitiveVectors.addAll(av.getPrimitiveVectors());
+      } else {
+        primitiveVectors.add(v);
+      }
+    }
+    return primitiveVectors;
+  }
 
-  public abstract VectorWithOrdinal getVectorWithOrdinal(String name);
+  public VectorWithOrdinal getVectorWithOrdinal(String name) {
+    final int ordinal = vectors.getOrdinal(name.toLowerCase());
+    if (ordinal < 0) {
+      return null;
+    }
+    final ValueVector vector = vectors.getByOrdinal(ordinal);
+    return new VectorWithOrdinal(vector, ordinal);
+  }
 
   public TypedFieldId getFieldIdIfMatches(TypedFieldId.Builder builder, boolean addToBreadCrumb, PathSegment seg) {
     if (seg == null) {
@@ -122,6 +271,24 @@ public abstract class AbstractContainerVector implements ValueVector{
     }
   }
 
+
+  @Override
+  public DrillBuf[] getBuffers(boolean clear) {
+    List<DrillBuf> buffers = Lists.newArrayList();
+    int expectedBufSize = getBufferSize();
+    int actualBufSize = 0 ;
+
+    for (ValueVector v : vectors.values()) {
+      for (DrillBuf buf : v.getBuffers(clear)) {
+        buffers.add(buf);
+        actualBufSize += buf.writerIndex();
+      }
+    }
+
+    Preconditions.checkArgument(actualBufSize == expectedBufSize);
+    return buffers.toArray(new DrillBuf[buffers.size()]);
+  }
+
   private MajorType getLastPathType() {
     if((this.getField().getType().getMinorType() == MinorType.LIST  &&
         this.getField().getType().getMode() == DataMode.REPEATED)) {  // Use Repeated scalar type instead of Required List.
@@ -140,16 +307,6 @@ public abstract class AbstractContainerVector implements ValueVector{
 
   protected boolean supportsDirectRead() {
     return false;
-  }
-
-  protected class VectorWithOrdinal{
-    final ValueVector vector;
-    final int ordinal;
-
-    public VectorWithOrdinal(ValueVector v, int ordinal) {
-      this.vector = v;
-      this.ordinal = ordinal;
-    }
   }
 
 }

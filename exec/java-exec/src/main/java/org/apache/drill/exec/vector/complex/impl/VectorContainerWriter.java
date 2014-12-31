@@ -94,7 +94,7 @@ public class VectorContainerWriter extends AbstractFieldWriter implements Comple
     public <T extends ValueVector> T addOrGet(String name, MajorType type, Class<T> clazz) {
       try {
         ValueVector v = mutator.addField(MaterializedField.create(name, type), clazz);
-        this.put(name, v);
+        putVector(name, v);
         return this.typeify(v, clazz);
       } catch (SchemaChangeException e) {
         throw new IllegalStateException(e);
