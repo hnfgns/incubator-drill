@@ -79,34 +79,35 @@ public abstract class AbstractContainerVector implements ValueVector {
   }
 
   public <T extends ValueVector> T addOrGet(String name, MajorType type, Class<T> clazz) {
-    boolean replace = false;
-    for (int i=0; i<2; i++) {
-      ValueVector vector = getVector(name);
-      if (replace || vector == null) {
-        vector = TypeHelper.getNewVector(field.getPath(), name, allocator, type);
-        Preconditions.checkNotNull(vector, String.format("Failure to create vector of type %s.", type));
-        putVector(name, vector);
-        if (callBack != null) {
-          callBack.doWork();
-        }
-      }
-      if (clazz.isAssignableFrom(vector.getClass())) {
-        return (T)vector;
-      }
-      boolean allNulls = true;
-      for (int r=0; r<vector.getAccessor().getValueCount(); r++) {
-        if (!vector.getAccessor().isNull(r)) {
-          allNulls = false;
-          break;
-        }
-      }
-      if (!allNulls) {
-        throw new IllegalStateException(String.format("Vector requested [%s] was different than type stored [%s].  Drill doesn't yet support hetergenous types.", clazz.getSimpleName(), vector.getClass().getSimpleName()));
-      }
-      vector.clear();
-      replace = true;
+    final ValueVector existing = getVector(name);
+    boolean create = false;
+    if (existing == null) {
+      create = true;
+    } else if (clazz.isAssignableFrom(existing.getClass())) {
+      return (T)existing;
+    } else if (nullFilled(existing)) {
+      existing.clear();
+      create = true;
     }
-    throw new IllegalStateException(String.format("Unable to create vector[%s] of desired type[%s -- %s].", name, type, clazz.getSimpleName()));
+    if (create) {
+      final T vector = (T)TypeHelper.getNewVector(field.getPath(), name, allocator, type);
+      putVector(name, vector);
+      if (callBack != null) {
+        callBack.doWork();
+      }
+      return vector;
+    }
+    final String message = "Drill does not support schema change yet. Existing[{}] and desired[{}] vector types mismatch";
+    throw new IllegalStateException(String.format(message, existing.getClass().getSimpleName(), clazz.getSimpleName()));
+  }
+
+  private boolean nullFilled(ValueVector vector) {
+    for (int r=0; r<vector.getAccessor().getValueCount(); r++) {
+      if (!vector.getAccessor().isNull(r)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   public ValueVector getVectorByOrdinal(int id) {
