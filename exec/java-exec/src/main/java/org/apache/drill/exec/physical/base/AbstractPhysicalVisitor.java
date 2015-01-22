@@ -28,6 +28,7 @@ import org.apache.drill.exec.physical.config.IteratorValidator;
 import org.apache.drill.exec.physical.config.Limit;
 import org.apache.drill.exec.physical.config.MergeJoinPOP;
 import org.apache.drill.exec.physical.config.MergingReceiverPOP;
+import org.apache.drill.exec.physical.config.NestedLoopJoinPOP;
 import org.apache.drill.exec.physical.config.OrderedPartitionSender;
 import org.apache.drill.exec.physical.config.ProducerConsumer;
 import org.apache.drill.exec.physical.config.Project;
@@ -146,6 +147,11 @@ public abstract class AbstractPhysicalVisitor<T, X, E extends Throwable> impleme
 
   @Override
   public T visitHashJoin(HashJoinPOP join, X value) throws E {
+    return visitOp(join, value);
+  }
+
+  @Override
+  public T visitNestedLoopJoin(NestedLoopJoinPOP join, X value) throws E {
     return visitOp(join, value);
   }
 
