@@ -1,0 +1,95 @@
+{
+  "head" : {
+    "version" : 1,
+    "generator" : {
+      "type" : "DefaultSqlHandler",
+      "info" : ""
+    },
+    "type" : "APACHE_DRILL_PHYSICAL",
+    "options" : [ {
+      "name" : "planner.width.max_per_node",
+      "kind" : "LONG",
+      "type" : "SESSION",
+      "num_val" : 2
+    } ],
+    "queue" : 0,
+    "resultMode" : "EXEC"
+  },
+  "graph" : [ {
+    "pop" : "fs-scan",
+    "@id" : 2,
+    "files" : [ "[WORKING_PATH]/src/test/resources/schemachange/multi/first.json", "[WORKING_PATH]/src/test/resources/schemachange/multi/second.json" ],
+    "storage" : {
+      "type" : "file",
+      "enabled" : true,
+      "connection" : "file:///",
+      "workspaces" : {
+        "home" : {
+          "location" : "/",
+          "writable" : false,
+          "defaultInputFormat" : null
+        },
+        "tmp" : {
+          "location" : "/tmp/drilltest",
+          "writable" : true,
+          "defaultInputFormat" : null
+        }
+      },
+      "formats" : {
+        "psv" : {
+          "type" : "text",
+          "extensions" : [ "tbl" ],
+          "delimiter" : "|"
+        },
+        "csv" : {
+          "type" : "text",
+          "extensions" : [ "csv", "bcp" ],
+          "delimiter" : ","
+        },
+        "tsv" : {
+          "type" : "text",
+          "extensions" : [ "tsv" ],
+          "delimiter" : "\t"
+        },
+        "parquet" : {
+          "type" : "parquet"
+        },
+        "json" : {
+          "type" : "json"
+        },
+        "txt" : {
+          "type" : "text",
+          "extensions" : [ "txt" ],
+          "delimiter" : "\n"
+        }
+      }
+    },
+    "format" : {
+      "type" : "json"
+    },
+    "columns" : [ "`a`", "`b`" ],
+    "selectionRoot" : "[WORKING_PATH]/src/test/resources/schemachange/multi",
+    "cost" : 0.0
+  }, {
+    "pop" : "project",
+    "@id" : 1,
+    "exprs" : [ {
+      "ref" : "`a`",
+      "expr" : "`a`"
+    }, {
+      "ref" : "`b`",
+      "expr" : "`b`"
+    } ],
+    "child" : 2,
+    "initialAllocation" : 1000000,
+    "maxAllocation" : 10000000000,
+    "cost" : 1.0
+  }, {
+    "pop" : "screen",
+    "@id" : 0,
+    "child" : 1,
+    "initialAllocation" : 1000000,
+    "maxAllocation" : 10000000000,
+    "cost" : 1.0
+  } ]
+}

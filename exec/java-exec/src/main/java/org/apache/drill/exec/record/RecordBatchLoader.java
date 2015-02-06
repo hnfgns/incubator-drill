@@ -29,7 +29,7 @@ import org.apache.drill.exec.expr.TypeHelper;
 import org.apache.drill.exec.memory.BufferAllocator;
 import org.apache.drill.exec.proto.UserBitShared.RecordBatchDef;
 import org.apache.drill.exec.proto.UserBitShared.SerializedField;
-import org.apache.drill.exec.vector.AllocationHelper;
+import org.apache.drill.exec.vector.EmptyValueVector;
 import org.apache.drill.exec.vector.ValueVector;
 
 import com.google.common.base.Preconditions;
@@ -90,10 +90,13 @@ public class RecordBatchLoader implements VectorAccessible, Iterable<VectorWrapp
         vector = TypeHelper.getNewVector(fieldDef, allocator);
       }
 
-      if (fmd.getValueCount() == 0 && (!fmd.hasGroupCount() || fmd.getGroupCount() == 0)) {
-        AllocationHelper.allocate(vector, 0, 0, 0);
-      } else {
-        vector.load(fmd, buf.slice(bufOffset, fmd.getBufferLength()));
+//      if (fmd.getValueCount() == 0 && (!fmd.hasGroupCount() || fmd.getGroupCount() == 0)) {
+//        AllocationHelper.allocate(vector, 0, 0, 0);
+//      } else {
+      vector.load(fmd, buf.slice(bufOffset, fmd.getBufferLength()));
+//      }
+      if (vector.getAccessor().getValueCount() == 0) {
+        vector = new EmptyValueVector(vector);
       }
       bufOffset += fmd.getBufferLength();
       newVectors.add(vector);

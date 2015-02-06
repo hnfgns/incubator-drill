@@ -142,7 +142,11 @@ public class TestBuilder {
 
   public TestBuilder physicalPlanFromFile(String queryFile) throws IOException {
     String query = BaseTestQuery.getFile(queryFile);
-    this.query = query;
+    return physicalPlan(query);
+  }
+
+  public TestBuilder physicalPlan(String physicalPlan) throws IOException {
+    this.query = physicalPlan;
     this.queryType = UserBitShared.QueryType.PHYSICAL;
     return this;
   }
