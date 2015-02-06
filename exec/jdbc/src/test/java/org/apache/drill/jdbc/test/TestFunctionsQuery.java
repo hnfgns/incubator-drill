@@ -20,13 +20,14 @@ package org.apache.drill.jdbc.test;
 import java.nio.file.Paths;
 
 import org.apache.drill.jdbc.Driver;
+import org.apache.drill.jdbc.JdbcTest;
 import org.joda.time.DateTime;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 import org.junit.Ignore;
 import org.junit.Test;
 
-public class TestFunctionsQuery {
+public class TestFunctionsQuery extends JdbcTest {
 
   public static final String WORKING_PATH;
   static{
