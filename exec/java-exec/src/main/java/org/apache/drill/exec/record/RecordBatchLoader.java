@@ -75,6 +75,7 @@ public class RecordBatchLoader implements VectorAccessible, Iterable<VectorWrapp
     }
     Preconditions.checkNotNull(incoming, "incoming buffer cannot be null");
 
+    container.buildSchema(BatchSchema.SelectionVectorMode.NONE);
     boolean schemaChanged = getSchema() == null;
 
     final Map<MaterializedField, ValueVector> oldFields = Maps.newHashMap();
