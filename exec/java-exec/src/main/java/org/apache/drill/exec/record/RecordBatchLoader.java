@@ -61,8 +61,17 @@ public class RecordBatchLoader implements VectorAccessible, Iterable<VectorWrapp
    * @return Whether or not the schema changed since the previous load.
    * @throws SchemaChangeException
    */
-  public boolean load(RecordBatchDef def, DrillBuf incoming) throws SchemaChangeException {
+  public boolean load(final RecordBatchDef def, final DrillBuf buffer) throws SchemaChangeException {
     Preconditions.checkNotNull(def, "batch definition cannot be null");
+    final DrillBuf incoming;
+    if (buffer == null) {
+      if (def.getRecordCount() != 0) {
+        throw new IllegalArgumentException("value count must be zero when incoming buffer is null");
+      }
+      incoming = allocator.getEmpty();
+    } else {
+      incoming = buffer;
+    }
     Preconditions.checkNotNull(incoming, "incoming buffer cannot be null");
 
     container.buildSchema(BatchSchema.SelectionVectorMode.NONE);
@@ -93,9 +102,10 @@ public class RecordBatchLoader implements VectorAccessible, Iterable<VectorWrapp
       }
 
 //      if (fmd.getValueCount() == 0 && (!fmd.hasGroupCount() || fmd.getGroupCount() == 0)) {
+//      if (incoming == null || fmd.getValueCount() == 0) {
 //        AllocationHelper.allocate(vector, 0, 0, 0);
 //      } else {
-      vector.load(fmd, incoming.slice(bufOffset, fmd.getBufferLength()));
+        vector.load(fmd, incoming.slice(bufOffset, fmd.getBufferLength()));
 //      }
       bufOffset += fmd.getBufferLength();
       container.add(vector);
