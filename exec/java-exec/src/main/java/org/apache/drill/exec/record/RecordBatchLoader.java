@@ -38,43 +38,45 @@ import com.google.common.collect.Maps;
 public class RecordBatchLoader implements VectorAccessible, Iterable<VectorWrapper<?>>{
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(RecordBatchLoader.class);
 
-  private VectorContainer container = new VectorContainer();
+  private final VectorContainer container;
   private final BufferAllocator allocator;
-  private int valueCount;
-  private BatchSchema schema;
+  private int recordCount;
+
+  protected RecordBatchLoader(VectorContainer container, BufferAllocator allocator) {
+    this.container = Preconditions.checkNotNull(container, "container cannot be null");
+    this.allocator = Preconditions.checkNotNull(allocator, "allocator cannot be null");
+  }
 
   public RecordBatchLoader(BufferAllocator allocator) {
-    super();
-    this.allocator = allocator;
+    this(new VectorContainer(), allocator);
   }
 
   /**
-   * Load a record batch from a single buffer.
+   * Load a record batch from a single incoming.
    *
    * @param def
    *          The definition for the record batch.
-   * @param buf
-   *          The buffer that holds the data associated with the record batch
+   * @param incoming
+   *          The incoming that holds the data associated with the record batch
    * @return Whether or not the schema changed since the previous load.
    * @throws SchemaChangeException
    */
-  public boolean load(RecordBatchDef def, DrillBuf buf) throws SchemaChangeException {
-//    logger.debug("Loading record batch with def {} and data {}", def, buf);
-    container.zeroVectors();
-    this.valueCount = def.getRecordCount();
-    boolean schemaChanged = schema == null;
-//    logger.info("Load, ThreadID: {}", Thread.currentThread().getId(), new RuntimeException("For Stack Trace Only"));
-//    System.out.println("Load, ThreadId: " + Thread.currentThread().getId());
-    Map<MaterializedField, ValueVector> oldFields = Maps.newHashMap();
-    for(VectorWrapper<?> w : container){
-      ValueVector v = w.getValueVector();
-      oldFields.put(v.getField(), v);
+  public boolean load(RecordBatchDef def, DrillBuf incoming) throws SchemaChangeException {
+    Preconditions.checkNotNull(def, "batch definition cannot be null");
+    Preconditions.checkNotNull(incoming, "incoming buffer cannot be null");
+
+    container.buildSchema(BatchSchema.SelectionVectorMode.NONE);
+    boolean schemaChanged = getSchema() == null;
+
+    final Map<MaterializedField, ValueVector> oldFields = Maps.newHashMap();
+    for (VectorWrapper<?> wrapper : container) {
+      final ValueVector vector = wrapper.getValueVector();
+      oldFields.put(vector.getField(), vector);
     }
 
-    VectorContainer newVectors = new VectorContainer();
+    clear();
 
-    List<SerializedField> fields = def.getFieldList();
-
+    final List<SerializedField> fields = def.getFieldList();
     int bufOffset = 0;
     for (SerializedField fmd : fields) {
       MaterializedField fieldDef = MaterializedField.create(fmd);
@@ -90,68 +92,44 @@ public class RecordBatchLoader implements VectorAccessible, Iterable<VectorWrapp
         vector = TypeHelper.getNewVector(fieldDef, allocator);
       }
 
-      if (fmd.getValueCount() == 0 && (!fmd.hasGroupCount() || fmd.getGroupCount() == 0)) {
-        AllocationHelper.allocate(vector, 0, 0, 0);
-      } else {
-        vector.load(fmd, buf.slice(bufOffset, fmd.getBufferLength()));
-      }
+//      if (fmd.getValueCount() == 0 && (!fmd.hasGroupCount() || fmd.getGroupCount() == 0)) {
+//        AllocationHelper.allocate(vector, 0, 0, 0);
+//      } else {
+      vector.load(fmd, incoming.slice(bufOffset, fmd.getBufferLength()));
+//      }
       bufOffset += fmd.getBufferLength();
-      newVectors.add(vector);
+      container.add(vector);
     }
 
-    Preconditions.checkArgument(buf == null || bufOffset == buf.capacity());
+    Preconditions.checkState(bufOffset == incoming.capacity(), "received incoming must be consumed entirely");
 
-    if(!oldFields.isEmpty()){
+    if (!oldFields.isEmpty()) {
       schemaChanged = true;
-      for(ValueVector v : oldFields.values()){
-        v.close();
+      for (ValueVector vector:oldFields.values()) {
+        vector.close();
       }
     }
 
-    // rebuild the schema.
-    SchemaBuilder b = BatchSchema.newBuilder();
-    for(VectorWrapper<?> v : newVectors){
-      b.addField(v.getField());
-    }
-    b.setSelectionVectorMode(BatchSchema.SelectionVectorMode.NONE);
-    this.schema = b.build();
-    newVectors.buildSchema(BatchSchema.SelectionVectorMode.NONE);
-    container = newVectors;
+    recordCount = def.getRecordCount();
+    container.buildSchema(BatchSchema.SelectionVectorMode.NONE);
     return schemaChanged;
-
   }
 
   public TypedFieldId getValueVectorId(SchemaPath path) {
     return container.getValueVectorId(path);
   }
 
-
-
-//
-//  @SuppressWarnings("unchecked")
-//  public <T extends ValueVector> T getValueVectorId(int fieldId, Class<?> clazz) {
-//    ValueVector v = container.get(fieldId);
-//    assert v != null;
-//    if (v.getClass() != clazz){
-//      logger.warn(String.format(
-//          "Failure while reading vector.  Expected vector class of %s but was holding vector class %s.",
-//          clazz.getCanonicalName(), v.getClass().getCanonicalName()));
-//      return null;
-//    }
-//    return (T) v;
-//  }
-
   public int getRecordCount() {
-    return valueCount;
+    return recordCount;
   }
 
   public VectorWrapper<?> getValueAccessorById(Class<?> clazz, int... ids){
     return container.getValueAccessorById(clazz, ids);
   }
 
-  public WritableBatch getWritableBatch(){
-    boolean isSV2 = (schema.getSelectionVectorMode() == BatchSchema.SelectionVectorMode.TWO_BYTE);
-    return WritableBatch.getBatchNoHVWrap(valueCount, container, isSV2);
+  public WritableBatch getWritableBatch() {
+    boolean isSV2 = (getSchema().getSelectionVectorMode() == BatchSchema.SelectionVectorMode.TWO_BYTE);
+    return WritableBatch.getBatchNoHVWrap(recordCount, container, isSV2);
   }
 
   @Override
@@ -160,25 +138,16 @@ public class RecordBatchLoader implements VectorAccessible, Iterable<VectorWrapp
   }
 
   public BatchSchema getSchema(){
-    return schema;
+    return container.getSchema();
   }
 
   public void clear(){
     container.clear();
+    recordCount = 0;
   }
 
-  public void canonicalize() {
-    //logger.debug( "RecordBatchLoader : before schema " + schema);
-    container = VectorContainer.canonicalize(container);
-
-    // rebuild the schema.
-    SchemaBuilder b = BatchSchema.newBuilder();
-    for(VectorWrapper<?> v : container){
-      b.addField(v.getField());
-    }
-    b.setSelectionVectorMode(BatchSchema.SelectionVectorMode.NONE);
-    this.schema = b.build();
-
-    //logger.debug( "RecordBatchLoader : after schema " + schema);
+  public RecordBatchLoader canonicalize() {
+    final VectorContainer canonical = VectorContainer.canonicalize(container);
+    return new RecordBatchLoader(canonical, allocator);
   }
 }

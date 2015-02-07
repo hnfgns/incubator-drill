@@ -17,6 +17,7 @@
  */
 package io.netty.buffer;
 
+import com.google.common.base.Preconditions;
 import io.netty.util.internal.PlatformDependent;
 
 import java.io.IOException;
@@ -63,12 +64,12 @@ public final class DrillBuf extends AbstractByteBuf {
     this.allocator = allocator;
   }
 
-  private DrillBuf(ByteBuffer bb) {
+  private DrillBuf(ByteBuffer bb, BufferAllocator allocator, Accountor accountor) {
     super(bb.remaining());
     UnpooledUnsafeDirectByteBuf bytebuf = new UnpooledUnsafeDirectByteBuf(UnpooledByteBufAllocator.DEFAULT, bb, bb.remaining());
-    this.acct = FakeAllocator.FAKE_ACCOUNTOR;
+    this.acct = Preconditions.checkNotNull(accountor);
+    this.allocator = Preconditions.checkNotNull(allocator);
     this.addr = bytebuf.memoryAddress();
-    this.allocator = FakeAllocator.FAKE_ALLOCATOR;
     this.b = bytebuf;
     this.length = bytebuf.capacity();
     this.offset = 0;
@@ -683,12 +684,20 @@ public final class DrillBuf extends AbstractByteBuf {
   }
 
   public static DrillBuf wrapByteBuffer(ByteBuffer b) {
-    if (!b.isDirect()) {
-      throw new IllegalStateException("DrillBufs can only refer to direct memory.");
-    } else {
-      return new DrillBuf(b);
-    }
-
+    return wrapByteBuffer(b, FakeAllocator.FAKE_ALLOCATOR, FakeAllocator.FAKE_ACCOUNTOR);
   }
 
-}
+  public static DrillBuf wrapByteBuffer(ByteBuffer b, BufferAllocator allocator) {
+    return wrapByteBuffer(b, allocator, FakeAllocator.FAKE_ACCOUNTOR);
+  }
+
+  public static DrillBuf wrapByteBuffer(ByteBuffer buffer, BufferAllocator allocator, Accountor accountor) {
+    if (!buffer.isDirect()) {
+      throw new IllegalStateException("DrillBufs can only refer to direct memory.");
+    } else {
+      return new DrillBuf(buffer, allocator, accountor);
+    }
+  }
+
+
+  }

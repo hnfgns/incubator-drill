@@ -247,10 +247,12 @@ public class MergingRecordBatch extends AbstractRecordBatch<MergingReceiverPOP> 
         ++i;
       }
 
+      final RecordBatchLoader[] canonicalLoaders = new RecordBatchLoader[batchLoaders.length];
       // Canonicalize each incoming batch, so that vectors are alphabetically sorted based on SchemaPath.
-      for (RecordBatchLoader loader : batchLoaders) {
-        loader.canonicalize();
+      for (int j=0; j < canonicalLoaders.length; j++) {
+        canonicalLoaders[j] = batchLoaders[j].canonicalize();
       }
+      batchLoaders = canonicalLoaders;
 
       // Ensure all the incoming batches have the identical schema.
       if (!isSameSchemaAmongBatches(batchLoaders)) {
