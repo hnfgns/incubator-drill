@@ -41,6 +41,7 @@ import org.apache.drill.exec.record.MaterializedField;
 import org.apache.drill.exec.record.TransferPair;
 import org.apache.drill.exec.util.CallBack;
 import org.apache.drill.exec.util.JsonStringHashMap;
+import org.apache.drill.exec.vector.BaseValueVector;
 import org.apache.drill.exec.vector.ValueVector;
 import org.apache.drill.exec.vector.complex.RepeatedMapVector.MapSingleCopier;
 import org.apache.drill.exec.vector.complex.impl.SingleMapReaderImpl;
@@ -64,6 +65,12 @@ public class MapVector extends AbstractMapVector {
 
   public MapVector(MaterializedField field, BufferAllocator allocator, CallBack callBack){
     super(field, allocator, callBack);
+  }
+
+  @Override
+  public FieldReader getReader() {
+    //return new SingleMapReaderImpl(MapVector.this);
+    return reader;
   }
 
   transient private MapTransferPair ephPair;
@@ -98,7 +105,7 @@ public class MapVector extends AbstractMapVector {
       return 0;
     }
     long buffer = 0;
-    for (ValueVector v : this) {
+    for (ValueVector v : (Iterable<ValueVector>)this) {
       buffer += v.getBufferSize();
     }
 
@@ -273,7 +280,7 @@ public class MapVector extends AbstractMapVector {
     return mutator;
   }
 
-  public class Accessor implements ValueVector.Accessor{
+  public class Accessor extends BaseValueVector.BaseAccessor {
 
     @Override
     public Object getObject(int index) {
@@ -297,27 +304,13 @@ public class MapVector extends AbstractMapVector {
       return valueCount;
     }
 
-    @Override
-    public boolean isNull(int index) {
-      return false;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public FieldReader getReader() {
-      //return new SingleMapReaderImpl(MapVector.this);
-      return reader;
-    }
   }
 
   public ValueVector getVectorById(int id) {
     return getChildByOrdinal(id);
   }
 
-  public class Mutator implements ValueVector.Mutator{
+  public class Mutator extends BaseValueVector.BaseMutator {
 
     @Override
     public void setValueCount(int valueCount) {

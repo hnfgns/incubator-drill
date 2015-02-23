@@ -44,22 +44,26 @@ package org.apache.drill.exec.vector;
  * NB: this class is automatically generated from ValueVectorTypes.tdd using FreeMarker.
  */
 @SuppressWarnings("unused")
-public final class ${className} extends BaseValueVector implements <#if type.major == "VarLen">VariableWidth<#else>FixedWidth</#if>Vector, NullableVector{
+public final class ${className} extends BaseDataValueVector implements <#if type.major == "VarLen">VariableWidth<#else>FixedWidth</#if>Vector, NullableVector{
+  private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(${className}.class);
+
+  private final FieldReader reader = new Nullable${minor.class}ReaderImpl(Nullable${minor.class}Vector.this);
 
   private int valueCount;
-  final UInt1Vector bits;
-  final ${valuesName} values;
-  private final Accessor accessor;
-  private final Mutator mutator;
+  private final UInt1Vector bits = new UInt1Vector(MaterializedField.create(field + "_bits", Types.required(MinorType.UINT1)), allocator);
+  private final ${valuesName} values = new ${minor.class}Vector(field, allocator);
+  private final Mutator mutator = new Mutator();
+  private final Accessor accessor = new Accessor();
 
   public ${className}(MaterializedField field, BufferAllocator allocator) {
     super(field, allocator);
-    this.bits = new UInt1Vector(MaterializedField.create(field + "_bits", Types.required(MinorType.UINT1)), allocator);
-    this.values = new ${minor.class}Vector(field, allocator);
-    this.accessor = new Accessor();
-    this.mutator = new Mutator();
   }
-  
+
+  @Override
+  public FieldReader getReader(){
+    return reader;
+  }
+
   public int getValueCapacity(){
     return Math.min(bits.getValueCapacity(), values.getValueCapacity());
   }
@@ -350,14 +354,9 @@ public final class ${className} extends BaseValueVector implements <#if type.maj
   
   public final class Accessor implements ValueVector.Accessor<#if type.major = "VarLen">, VariableWidthVector.VariableWidthAccessor</#if>{
 
-    final FieldReader reader = new Nullable${minor.class}ReaderImpl(Nullable${minor.class}Vector.this);
     final UInt1Vector.Accessor bAccessor = bits.getAccessor();
     final ${valuesName}.Accessor vAccessor = values.getAccessor();
-    
-    public FieldReader getReader(){
-      return reader;
-    }
-    
+
     /**
      * Get the element at the specified position.
      *
@@ -607,14 +606,14 @@ public final class ${className} extends BaseValueVector implements <#if type.maj
     public boolean noNulls(){
       return valueCount == setCount;
     }
-    
+
     public void generateTestData(int valueCount){
       bits.getMutator().generateTestDataAlt(valueCount);
       values.getMutator().generateTestData(valueCount);
       <#if type.major = "VarLen">lastSet = valueCount;</#if>
       setValueCount(valueCount);
     }
-    
+
     public void reset(){
       setCount = 0;
       <#if type.major = "VarLen">lastSet = -1;</#if>
