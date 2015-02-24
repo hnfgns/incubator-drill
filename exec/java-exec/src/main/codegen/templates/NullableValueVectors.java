@@ -15,6 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+import org.apache.drill.exec.vector.BaseDataValueVector;
 import org.apache.drill.exec.vector.NullableVectorDefinitionSetter;
 
 import java.lang.Override;
@@ -352,7 +353,7 @@ public final class ${className} extends BaseDataValueVector implements <#if type
   }
   </#if>
   
-  public final class Accessor implements ValueVector.Accessor<#if type.major = "VarLen">, VariableWidthVector.VariableWidthAccessor</#if>{
+  public final class Accessor extends BaseDataValueVector.BaseAccessor <#if type.major = "VarLen">implements VariableWidthVector.VariableWidthAccessor</#if> {
 
     final UInt1Vector.Accessor bAccessor = bits.getAccessor();
     final ${valuesName}.Accessor vAccessor = values.getAccessor();
@@ -433,7 +434,7 @@ public final class ${className} extends BaseDataValueVector implements <#if type
     public void reset(){}
   }
   
-  public final class Mutator implements ValueVector.Mutator, NullableVectorDefinitionSetter<#if type.major = "VarLen">, VariableWidthVector.VariableWidthMutator</#if> {
+  public final class Mutator extends BaseDataValueVector.BaseMutator implements NullableVectorDefinitionSetter<#if type.major = "VarLen">, VariableWidthVector.VariableWidthMutator</#if> {
     
     private int setCount;
     <#if type.major = "VarLen"> private int lastSet = -1;</#if>

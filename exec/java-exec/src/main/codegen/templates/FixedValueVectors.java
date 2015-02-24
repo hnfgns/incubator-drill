@@ -243,7 +243,7 @@ public final class ${minor.class}Vector extends BaseDataValueVector implements F
     ++allocationMonitor;
   }
 
-  public final class Accessor extends BaseValueVector.BaseAccessor{
+  public final class Accessor extends BaseDataValueVector.BaseAccessor {
 
     public int getValueCount() {
       return valueCount;
@@ -551,7 +551,7 @@ public final class ${minor.class}Vector extends BaseDataValueVector implements F
   *
   * NB: this class is automatically generated from ValueVectorTypes.tdd using FreeMarker.
   */
-  public final class Mutator extends BaseValueVector.BaseMutator{
+  public final class Mutator extends BaseDataValueVector.BaseMutator {
 
     private Mutator(){};
    /**
