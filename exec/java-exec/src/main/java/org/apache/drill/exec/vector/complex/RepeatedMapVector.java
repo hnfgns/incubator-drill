@@ -210,7 +210,11 @@ public class RepeatedMapVector extends AbstractMapVector implements RepeatedValu
   }
 
   public TransferPair getTransferPairToSingleMap(FieldReference reference) {
-    return new SingleMapTransferPair(this, reference);
+    MaterializedField mf = MaterializedField.create(reference, Types.required(MinorType.MAP));
+    for (MaterializedField childMf : getField().getChildren()) {
+      mf.addChild(childMf);
+    }
+    return new SingleMapTransferPair(this, new MapVector(mf, allocator, callBack), false);
   }
 
   @Override

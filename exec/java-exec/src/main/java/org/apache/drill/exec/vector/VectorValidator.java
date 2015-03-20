@@ -30,9 +30,12 @@ public class VectorValidator {
       case NONE: {
         for (VectorWrapper w : batch) {
           ValueVector v = w.getValueVector();
+          System.out.println("validate vector: " + v.getField().getPath().toExpr());
+          System.out.println("with field info: " + v.getField());
           for (int i = 0; i < count; i++) {
             Object obj = v.getAccessor().getObject(i);
             if (obj != null) {
+              System.out.println(obj);
               hash = obj.hashCode() ^ hash;
             }
           }

@@ -165,6 +165,10 @@ public class StoragePluginRegistry implements Iterable<Map.Entry<String, Storage
       Map<String, StoragePlugin> activePlugins = new HashMap<String, StoragePlugin>();
       for (Map.Entry<String, StoragePluginConfig> entry : pluginSystemTable) {
         String name = entry.getKey();
+        // TODO - temp workaround, delete me
+        if (name.equals("hbase") || name.equals("hive") || name.equals("mongo")) {
+          continue;
+        }
         StoragePluginConfig config = entry.getValue();
         if (config.isEnabled()) {
           try {

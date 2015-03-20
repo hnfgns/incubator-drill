@@ -35,7 +35,7 @@ import org.apache.drill.exec.vector.VectorValidator;
 public class IteratorValidatorBatchIterator implements RecordBatch {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(IteratorValidatorBatchIterator.class);
 
-  static final boolean VALIDATE_VECTORS = false;
+  static final boolean VALIDATE_VECTORS = true;
 
   private IterOutcome state = IterOutcome.NOT_YET;
   private final RecordBatch incoming;
@@ -119,6 +119,7 @@ public class IteratorValidatorBatchIterator implements RecordBatch {
     if (first) {
       first = !first;
     }
+    System.out.println("validate output of batch: " + incoming.getClass().getSimpleName());
 
     if (state == IterOutcome.OK || state == IterOutcome.OK_NEW_SCHEMA) {
       BatchSchema schema = incoming.getSchema();

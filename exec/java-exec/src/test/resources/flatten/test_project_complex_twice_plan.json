@@ -1,0 +1,94 @@
+{
+  "head" : {
+    "version" : 1,
+    "generator" : {
+      "type" : "DefaultSqlHandler",
+      "info" : ""
+    },
+    "type" : "APACHE_DRILL_PHYSICAL",
+    "options" : [ {
+      "name" : "planner.width.max_per_node",
+      "kind" : "LONG",
+      "type" : "SESSION",
+      "num_val" : 1
+    } ],
+    "queue" : 0,
+    "resultMode" : "EXEC"
+  },
+  "graph" : [ {
+    "pop" : "fs-scan",
+    "@id" : 4,
+    "userName" : "jaltekruse",
+    "files" : [ "/flatten/drill-2099-result.json" ],
+    "storage" : {
+      "type" : "file",
+      "enabled" : true,
+      "connection" : "classpath:///",
+      "workspaces" : null,
+      "formats" : {
+        "csv" : {
+          "type" : "text",
+          "extensions" : [ "csv" ],
+          "delimiter" : ","
+        },
+        "tsv" : {
+          "type" : "text",
+          "extensions" : [ "tsv" ],
+          "delimiter" : "\t"
+        },
+        "json" : {
+          "type" : "json"
+        },
+        "parquet" : {
+          "type" : "parquet"
+        },
+        "avro" : {
+          "type" : "avro"
+        }
+      }
+    },
+    "format" : {
+      "type" : "json"
+    },
+    "columns" : [ "`rptds`" ],
+    "selectionRoot" : "/flatten/drill-2099-result.json",
+    "cost" : 4.0
+  }, {
+    "pop" : "project",
+    "@id" : 2,
+    "exprs" : [ {
+      "ref" : "`rptds`",
+      "expr" : "`rptds`"
+    },{
+      "ref" : "`rptds2`",
+      "expr" : "`rptds`"
+    }],
+    "child" : 4,
+    "initialAllocation" : 1000000,
+    "maxAllocation" : 10000000000,
+    "cost" : 4.0
+  },
+  {
+    "pop" : "project",
+    "@id" : 1,
+    "exprs" : [ {
+      "ref" : "`rptds`",
+      "expr" : "`rptds2`"
+    }, {
+      "ref" : "`rptds3`",
+      "expr" : "`rptds2`"
+    }],
+    "child" : 2,
+    "initialAllocation" : 1000000,
+    "maxAllocation" : 10000000000,
+    "cost" : 4.0
+  },
+   {
+    "pop" : "screen",
+    "@id" : 0,
+    "child" : 1,
+    "initialAllocation" : 1000000,
+    "maxAllocation" : 10000000000,
+    "cost" : 4.0
+  } ]
+}

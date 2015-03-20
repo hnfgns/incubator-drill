@@ -21,9 +21,12 @@ import static org.junit.Assert.assertEquals;
 
 import org.apache.drill.BaseTestQuery;
 import org.apache.drill.common.util.FileUtils;
+import org.apache.drill.exec.fn.interp.TestConstantFolding;
 import org.apache.drill.exec.proto.UserBitShared;
 import org.junit.Ignore;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 
 public class TestFlatten extends BaseTestQuery {
 
@@ -36,12 +39,98 @@ public class TestFlatten extends BaseTestQuery {
    */
   public static boolean RUN_ADVANCED_TESTS = false;
 
+  @Rule
+  public TemporaryFolder folder = new TemporaryFolder();
 
   @Test
   public void testFlattenFailure() throws Exception {
     test("select flatten(complex), rownum from cp.`/store/json/test_flatten_mappify2.json`");
 //    test("select complex, rownum from cp.`/store/json/test_flatten_mappify2.json`");
   }
+
+  @Test
+  public void testFlattenWithJoinNested() throws Exception {
+    test("select v1.uid, flatten(v1.event_map.events), flatten(v2.transaction_map.transactions) from \n" +
+        "    (select uid, event_map from cp.`flatten/complex_transaction_example_data_modified.json`) v1\n" +
+        "inner join\n" +
+        "    (select uid, transaction_map from cp.`flatten/complex_transaction_example_data_modified.json`) v2\n" +
+        "on v1.uid = v2.uid;");
+
+//   test("select e2 as events, e2 as events2, uid from (select v1.uid, v1.event_map.events as e, v1.event_map.events as e2 from \n" +
+//       "    (select uid, event_map from cp.`flatten/complex_transaction_example_data_modified.json`) v1\n" +
+//       "inner join\n" +
+//       "    (select uid, transaction_map from cp.`flatten/complex_transaction_example_data_modified.json`) v2\n" +
+//       "on v1.uid = v2.uid)");
+  }
+
+ @Test
+ public void testFlattenWithJoin() throws Exception {
+   test("alter session set `planner.width.max_per_node` = 1");
+   test("select v1.uid, flatten(events), flatten(transactions) from \n" +
+       "    (select uid, events from cp.`flatten/complex_transaction_example_data.json`) v1\n" +
+       "inner join\n" +
+       "    (select uid, transactions from cp.`flatten/complex_transaction_example_data.json`) v2\n" +
+       "on v1.uid = v2.uid;");
+
+
+//   test("select e2 as events, e2 as events2, uid from (select v1.uid, events as e, events as e2 from \n" +
+//       "    (select uid, events from cp.`flatten/complex_transaction_example_data.json`) v1\n" +
+//       "inner join\n" +
+//       "    (select uid, transactions from cp.`flatten/complex_transaction_example_data.json`) v2\n" +
+//       "on v1.uid = v2.uid)");
+
+    // both of these work
+//    test("select e as events2, e as e2 from (select uid as u, events as e, events from cp.`flatten/complex_transaction_example_data.json`)");
+//    test("select events as events2, events as e2 from (select uid as u, events as e, events from cp.`flatten/complex_transaction_example_data.json`)");
+
+//   test("select uid, transactions from (select uid, transactions from cp.`flatten/complex_transaction_example_data.json`) as t");
+//   testPhysicalFromFile("flatten/test_project_complex_twice_plan.json");
+ }
+
+  @Test
+  public void testFlatten_Drill2162_complex() throws Exception {
+    String path = folder.getRoot().toPath().toString();
+
+    String jsonRecords = BaseTestQuery.getFile("flatten/complex_transaction_example_data.json");
+    int numCopies = 700;
+    new TestConstantFolding.SmallFileCreator(folder).
+        setRecord(jsonRecords)
+        .createFiles(1, numCopies, "json");
+
+    // The file that is being read to generate the large file contains two records
+    final int numRecords = 2;
+    final int listSize = 5;
+    final int repeatedListSize = 2;
+
+    // Each of the lists inside of the repeated lists is flattened individually
+    // so the listSize is multiplied in twice to get the total record count produced
+    //    from the query: flatten(d.lst_lst[1]) lst1, flatten(d.lst_lst[0]) lst0
+    assertEquals("Wrong record count returned from flatten.", listSize * listSize * repeatedListSize * numRecords * numCopies,
+        testRunAndPrint(UserBitShared.QueryType.SQL,
+            "select uid, flatten(d.lst_lst[1]) lst1, flatten(d.lst_lst[0]) lst0, flatten(d.lst_lst) lst from " +
+                "dfs.`" + path + "/bigfile/bigfile.json` d"));
+  };
+
+
+  @Test
+  public void testFlatten_Drill2162_simple() throws Exception {
+    String path = folder.getRoot().toPath().toString();
+
+    String jsonRecord = "{ \"int_list\" : [";
+    final int listSize = 30;
+    for (int i = 1; i < listSize; i++ ) {
+      jsonRecord += i + ", ";
+    }
+    jsonRecord += listSize + "] }";
+    int numRecords = 3000;
+    new TestConstantFolding.SmallFileCreator(folder)
+        .setRecord(jsonRecord)
+        .createFiles(1, numRecords, "json");
+
+    assertEquals("Wrong record count returned from flatten.", listSize * numRecords,
+        testRunAndPrint(UserBitShared.QueryType.SQL,
+            "select flatten(int_list) from dfs.`" + path + "/bigfile/bigfile.json`"));
+  };
 
   @Test
   public void drill1671() throws Exception{

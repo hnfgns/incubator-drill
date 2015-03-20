@@ -50,6 +50,10 @@ public class TestJdbcQuery extends JdbcTestQueryBase{
     testQuery("select * from cp.`employee.json`");
   }
 
+  @Test
+  public void testFlattenQuery() throws Exception{
+    testQuery("select flatten(config) from dfs.tmp.`/json_test.json`");
+  }
 
   @Test
   public void testCast() throws Exception{

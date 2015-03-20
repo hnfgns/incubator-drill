@@ -261,6 +261,7 @@ public class FlattenRecordBatch extends AbstractSingleRecordBatch<FlattenPOP> {
    */
   private TransferPair getFlattenFieldTransferPair(FieldReference reference) {
     final TypedFieldId fieldId = incoming.getValueVectorId(popConfig.getColumn());
+    final MaterializedField mf = incoming.getSchema().getColumn(fieldId.getFieldIds()[0]);
     final Class vectorClass = incoming.getSchema().getColumn(fieldId.getFieldIds()[0]).getValueClass();
     final ValueVector flattenField = incoming.getValueAccessorById(vectorClass, fieldId.getFieldIds()).getValueVector();
 
@@ -289,13 +290,13 @@ public class FlattenRecordBatch extends AbstractSingleRecordBatch<FlattenPOP> {
     final IntOpenHashSet transferFieldIds = new IntOpenHashSet();
 
     final NamedExpression flattenExpr = new NamedExpression(popConfig.getColumn(), new FieldReference(popConfig.getColumn()));
-    final ValueVectorReadExpression vectorRead = (ValueVectorReadExpression)ExpressionTreeMaterializer.materialize(flattenExpr.getExpr(), incoming, collector, context.getFunctionRegistry(), true);
+//    final ValueVectorReadExpression vectorRead = (ValueVectorReadExpression)ExpressionTreeMaterializer.materialize(flattenExpr.getExpr(), incoming, collector, context.getFunctionRegistry(), true);
     final TransferPair tp = getFlattenFieldTransferPair(flattenExpr.getRef());
 
     if (tp != null) {
       transfers.add(tp);
       container.add(tp.getTo());
-      transferFieldIds.add(vectorRead.getFieldId().getFieldIds()[0]);
+//      transferFieldIds.add(vectorRead.getFieldId().getFieldIds()[0]);
     }
 
     logger.debug("Added transfer for project expression.");
@@ -333,8 +334,20 @@ public class FlattenRecordBatch extends AbstractSingleRecordBatch<FlattenPOP> {
         ((DrillComplexWriterFuncHolder) ((DrillFuncHolderExpr) expr).getHolder()).setReference(namedExpression.getRef());
         cg.addExpr(expr);
       } else{
+        final ValueVector vector;
         // need to do evaluation.
-        ValueVector vector = TypeHelper.getNewVector(outputField, oContext.getAllocator());
+        if (expr instanceof ValueVectorReadExpression) {
+          final ValueVectorReadExpression vectorRead = (ValueVectorReadExpression) expr;
+          final FieldReference ref = getRef(namedExpression);
+          final TypeProtos.MajorType type = vectorRead.getMajorType();
+//          vector = incoming.getValueAccessorById(TypeHelper.getValueVectorClass(type.getMinorType(),type.getMode()),
+//              vectorRead.getTypedFieldId().getFieldIds()).getField();
+          vector = container.addOrGet(incoming.getValueAccessorById(TypeHelper.getValueVectorClass(type.getMinorType(),type.getMode()),
+              vectorRead.getTypedFieldId().getFieldIds()).getField().clone(ref));
+        } else {
+          vector = container.addOrGet(outputField, callBack);
+        }
+//        ValueVector vector = TypeHelper.getNewVector(outputField, oContext.getAllocator());
         allocationVectors.add(vector);
         TypedFieldId fid = container.add(vector);
         ValueVectorWriteExpression write = new ValueVectorWriteExpression(fid, expr, true);
