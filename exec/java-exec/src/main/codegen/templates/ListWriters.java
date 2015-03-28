@@ -47,7 +47,7 @@ public class ${mode}ListWriter extends AbstractFieldWriter{
   private Mode mode = Mode.INIT;
   private FieldWriter writer;
   protected ValueVector innerVector;
-  
+
   <#if mode == "Repeated">private int currentChildIndex = 0;</#if>
   public ${mode}ListWriter(String name, ${containerClass} container, FieldWriter parent){
     super(parent);
@@ -67,7 +67,11 @@ public class ${mode}ListWriter extends AbstractFieldWriter{
     inform(container.allocateNewSafe());
     </#if>
   }
-  
+
+  public ValueVector getVector() {
+    return innerVector;
+  }
+
   public void clear(){
     writer.clear();
   }
@@ -79,7 +83,7 @@ public class ${mode}ListWriter extends AbstractFieldWriter{
   public void setValueCount(int count){
     if(innerVector != null) innerVector.getMutator().setValueCount(count);
   }
-  
+
   public MapWriter map(){
     switch(mode){
     case INIT:
@@ -94,11 +98,11 @@ public class ${mode}ListWriter extends AbstractFieldWriter{
     case IN_MAP:
       return writer;
     }
-    
+
     throw new IllegalStateException(String.format("Needed to be in state INIT or IN_MAP but in mode %s", mode.name()));
 
   }
-  
+
   public ListWriter list(){
     switch(mode){
     case INIT:
@@ -113,24 +117,24 @@ public class ${mode}ListWriter extends AbstractFieldWriter{
     case IN_LIST:
       return writer;
     }
-    
+
     throw new IllegalStateException(String.format("Needed to be in state INIT or IN_LIST but in mode %s", mode.name()));
 
   }
-  
+
   <#list vv.types as type><#list type.minor as minor>
   <#assign lowerName = minor.class?uncap_first />
   <#assign upperName = minor.class?upper_case />
   <#assign capName = minor.class?cap_first />
   <#if lowerName == "int" ><#assign lowerName = "integer" /></#if>
-  
+
   private static final MajorType ${upperName}_TYPE = Types.repeated(MinorType.${upperName});
-  
+
   public ${capName}Writer ${lowerName}(){
     switch(mode){
     case INIT:
       int vectorCount = container.size();
-      Repeated${capName}Vector vector = container.addOrGet(name, ${upperName}_TYPE, Repeated${capName}Vector.class);   
+      Repeated${capName}Vector vector = container.addOrGet(name, ${upperName}_TYPE, Repeated${capName}Vector.class);
       innerVector = vector;
       writer = new Repeated${capName}WriterImpl(vector, this);
       if(vectorCount != container.size()) writer.allocate();

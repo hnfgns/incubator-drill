@@ -51,6 +51,11 @@ public class ObjectVector extends BaseValueVector{
     maxCount += allocationSize;
   }
 
+  @Override
+  public boolean isAllocated() {
+    return true;
+  }
+
   public final class Mutator implements ValueVector.Mutator {
 
     public void set(int index, Object obj) {

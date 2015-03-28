@@ -59,7 +59,11 @@ public final class ${className} extends BaseValueVector implements <#if type.maj
     this.accessor = new Accessor();
     this.mutator = new Mutator();
   }
-  
+
+  public boolean isAllocated() {
+    return values.isAllocated() && bits.isAllocated();
+  }
+
   public int getValueCapacity(){
     return Math.min(bits.getValueCapacity(), values.getValueCapacity());
   }

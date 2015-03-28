@@ -52,9 +52,17 @@ public class NullReader extends AbstractBaseReader implements FieldReader{
     return type;
   }
   
-  public void copyAsValue(MapWriter writer) {}
+  public void copyAsValue(MapWriter writer) {
+    if (!writer.getVector().isAllocated()) {
+      writer.allocateEmpty();
+    }
+  }
 
-  public void copyAsValue(ListWriter writer) {}
+  public void copyAsValue(ListWriter writer) {
+    if (!writer.getVector().isAllocated()) {
+      writer.allocateEmpty();
+    }
+  }
 
   <#list vv.types as type><#list type.minor as minor><#assign name = minor.class?cap_first /> 
   public void read(Nullable${name}Holder holder){
@@ -65,8 +73,17 @@ public class NullReader extends AbstractBaseReader implements FieldReader{
     throw new ArrayIndexOutOfBoundsException();
   }
   
-  public void copyAsValue(${minor.class}Writer writer){}
-  public void copyAsField(String name, ${minor.class}Writer writer){}
+  public void copyAsValue(${minor.class}Writer writer){
+    if (!writer.getVector().isAllocated()) {
+      writer.allocateEmpty();
+    }
+  }
+
+  public void copyAsField(String name, ${minor.class}Writer writer){
+    if (!writer.getVector().isAllocated()) {
+      writer.allocateEmpty();
+    }
+  }
 
   public void read(int arrayIndex, Nullable${name}Holder holder){
     throw new ArrayIndexOutOfBoundsException();

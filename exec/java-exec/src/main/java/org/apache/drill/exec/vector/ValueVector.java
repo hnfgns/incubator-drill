@@ -49,6 +49,13 @@ public interface ValueVector extends Closeable, Iterable<ValueVector> {
   public boolean allocateNewSafe();
 
   /**
+   * Returns true if the vector is allocated.
+   *
+   * A vector is allocated once underlying buffer is instantiated. The size of allocation does not matter.
+   */
+  boolean isAllocated();
+
+  /**
    * Set the initial record capacity
    * @param numRecords
    */

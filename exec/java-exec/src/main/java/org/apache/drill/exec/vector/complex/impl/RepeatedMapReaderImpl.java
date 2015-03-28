@@ -160,28 +160,43 @@ public class RepeatedMapReaderImpl extends AbstractFieldReader{
 
   @Override
   public void copyAsValue(MapWriter writer) {
-    if (currentOffset == NO_VALUES || writer.ok() == false) {
+    if (writer.ok() == false) {
       return;
     }
-    RepeatedMapWriter impl = (RepeatedMapWriter) writer;
-    impl.container.copyFromSafe(idx(), impl.idx(), vector);
+
+    if (currentOffset == NO_VALUES) {
+      writer.allocateEmpty();
+    } else {
+      RepeatedMapWriter impl = (RepeatedMapWriter) writer;
+      impl.container.copyFromSafe(idx(), impl.idx(), vector);
+    }
   }
 
   public void copyAsValueSingle(MapWriter writer) {
-    if (currentOffset == NO_VALUES || writer.ok() == false) {
+    if (writer.ok() == false) {
       return;
     }
-    SingleMapWriter impl = (SingleMapWriter) writer;
-    impl.container.copyFromSafe(currentOffset, impl.idx(), vector);
+
+    if (currentOffset == NO_VALUES) {
+      writer.allocateEmpty();
+    } else {
+      SingleMapWriter impl = (SingleMapWriter) writer;
+      impl.container.copyFromSafe(currentOffset, impl.idx(), vector);
+    }
   }
 
   @Override
   public void copyAsField(String name, MapWriter writer) {
-    if (currentOffset == NO_VALUES) {
+    if (writer.ok() == false) {
       return;
     }
-    RepeatedMapWriter impl = (RepeatedMapWriter) writer.map(name);
-    impl.container.copyFromSafe(idx(), impl.idx(), vector);
+
+    if (currentOffset == NO_VALUES) {
+      writer.allocateEmpty();
+    } else {
+      RepeatedMapWriter impl = (RepeatedMapWriter) writer.map(name);
+      impl.container.copyFromSafe(idx(), impl.idx(), vector);
+    }
   }
 
 }

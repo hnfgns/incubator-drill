@@ -100,6 +100,11 @@ public final class BitVector extends BaseDataValueVector implements FixedWidthVe
     return true;
   }
 
+  @Override
+  public boolean isAllocated() {
+    return data!=null;
+  }
+
   /**
    * Allocate a new memory space for this vector. Must be called prior to using the ValueVector.
    *

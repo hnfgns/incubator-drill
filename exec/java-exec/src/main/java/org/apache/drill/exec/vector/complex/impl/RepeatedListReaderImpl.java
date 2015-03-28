@@ -48,20 +48,42 @@ public class RepeatedListReaderImpl extends AbstractFieldReader{
 
   @Override
   public void copyAsValue(ListWriter writer) {
-    if (currentOffset == NO_VALUES || writer.ok() == false) {
+    if (writer.ok() == false) {
       return;
     }
-    RepeatedListWriter impl = (RepeatedListWriter) writer;
-    impl.container.copyFromSafe(idx(), impl.idx(), container);
+
+    if (currentOffset == NO_VALUES) {
+      if (writer.getVector() == null) {
+        // in order to allocate the repeated list we need to set a child scalar vector.
+        // child vector type does not matter since the allocation size is zero.
+        // use integer type to be consistent with other parts of the system
+        writer.integer();
+      }
+      writer.allocateEmpty();
+    } else {
+      RepeatedListWriter impl = (RepeatedListWriter) writer;
+      impl.container.copyFromSafe(idx(), impl.idx(), container);
+    }
   }
 
   @Override
   public void copyAsField(String name, MapWriter writer) {
-    if (currentOffset == NO_VALUES || writer.ok() == false) {
+    if (writer.ok() == false) {
       return;
     }
-    RepeatedListWriter impl = (RepeatedListWriter) writer.list(name);
-    impl.container.copyFromSafe(idx(), impl.idx(), container);
+
+    if (currentOffset == NO_VALUES) {
+      if (writer.getVector() == null) {
+        // in order to allocate the repeated list we need to set a child scalar vector.
+        // child vector type does not matter since the allocation size is zero.
+        // use integer type to be consistent with other parts of the system
+        writer.integer(name);
+      }
+      writer.allocateEmpty();
+    } else {
+      RepeatedListWriter impl = (RepeatedListWriter) writer.list(name);
+      impl.container.copyFromSafe(idx(), impl.idx(), container);
+    }
   }
 
   private int currentOffset;

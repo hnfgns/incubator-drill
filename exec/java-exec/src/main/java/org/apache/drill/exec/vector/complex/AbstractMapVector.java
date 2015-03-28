@@ -51,6 +51,16 @@ public abstract class AbstractMapVector extends AbstractContainerVector {
   }
 
   @Override
+  public boolean isAllocated() {
+    for (ValueVector vector:vectors.values()) {
+      if (!vector.isAllocated()) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  @Override
   public boolean allocateNewSafe() {
     for (ValueVector v : vectors.values()) {
       if (!v.allocateNewSafe()) {

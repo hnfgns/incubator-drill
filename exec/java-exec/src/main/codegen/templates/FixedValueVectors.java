@@ -63,6 +63,10 @@ public final class ${minor.class}Vector extends BaseDataValueVector implements F
     return mutator;
   }
 
+  public boolean isAllocated() {
+    return data!=null;
+  }
+
   @Override
   public void setInitialCapacity(int numRecords) {
     allocationValueCount = numRecords;

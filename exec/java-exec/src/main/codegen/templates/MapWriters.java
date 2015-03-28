@@ -54,6 +54,10 @@ public class ${mode}MapWriter extends AbstractFieldWriter{
     this.container = container;
   }
 
+  public ValueVector getVector() {
+    return container;
+  }
+
   public int getValueCapacity() {
     return container.getValueCapacity();
   }

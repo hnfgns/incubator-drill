@@ -37,6 +37,7 @@ import org.apache.drill.exec.proto.UserBitShared.SerializedField;
 import org.apache.drill.exec.record.MaterializedField;
 import org.apache.drill.exec.record.TransferPair;
 import org.apache.drill.exec.util.JsonStringArrayList;
+import org.apache.drill.exec.vector.AllocationHelper;
 import org.apache.drill.exec.vector.BaseDataValueVector;
 import org.apache.drill.exec.vector.RepeatedFixedWidthVector;
 import org.apache.drill.exec.util.CallBack;
@@ -79,6 +80,11 @@ public class RepeatedListVector extends AbstractContainerVector implements Repea
 
     this.offsets = new UInt4Vector(null, allocator);
     this.emptyPopulator = new EmptyValuePopulator(offsets);
+  }
+
+  @Override
+  public boolean isAllocated() {
+    return vector!=null && vector.isAllocated() && offsets.isAllocated();
   }
 
   @Override
@@ -417,6 +423,9 @@ public class RepeatedListVector extends AbstractContainerVector implements Repea
   public void allocateNew(int parentValueCount, int childValueCount) {
     clear();
     offsets.allocateNew(parentValueCount+1);
+    if (vector!=null) {
+      AllocationHelper.allocateNew(vector, childValueCount);
+    }
     mutator.reset();
     accessor.reset();
   }

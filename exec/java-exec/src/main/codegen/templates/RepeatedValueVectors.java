@@ -65,6 +65,10 @@ public final class Repeated${minor.class}Vector extends BaseValueVector implemen
     this.values = new ${minor.class}Vector(mf, allocator);
   }
 
+  public boolean isAllocated() {
+    return values.isAllocated() && offsets.isAllocated();
+  }
+
   public int getValueCapacity(){
     return Math.min(values.getValueCapacity(), offsets.getValueCapacity() - 1);
   }

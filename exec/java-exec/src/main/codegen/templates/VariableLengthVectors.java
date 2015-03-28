@@ -72,7 +72,12 @@ public final class ${minor.class}Vector extends BaseDataValueVector implements V
     this.mutator = new Mutator();
   }
 
-  public int getBufferSize(){
+  @Override
+  public boolean isAllocated() {
+    return data!=null && offsetVector.isAllocated();
+  }
+
+public int getBufferSize(){
     if(valueCount == 0) return 0;
     return offsetVector.getBufferSize() + data.writerIndex();
   }

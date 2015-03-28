@@ -34,6 +34,16 @@ public interface BaseWriter extends Positionable{
   int getValueCapacity();
   void resetState();
 
+  /**
+   Allocates underlying vector to hold no values.
+   */
+  void allocateEmpty();
+
+  /**
+   * Returns underlying vector.
+   */
+  ValueVector getVector();
+
   public interface MapWriter extends BaseWriter{
 
     MaterializedField getField();

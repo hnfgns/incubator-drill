@@ -68,7 +68,11 @@ public class ${eName}WriterImpl extends AbstractFieldWriter {
   public void allocate(){
     inform(vector.allocateNewSafe());
   }
-  
+
+  public ValueVector getVector() {
+    return vector;
+  }
+
   public void clear(){
     vector.clear();
   }

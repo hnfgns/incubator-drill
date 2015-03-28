@@ -47,6 +47,11 @@ public class ComplexWriterImpl extends AbstractFieldWriter implements ComplexWri
     this.container = container;
   }
 
+  @Override
+  public ValueVector getVector() {
+    return container;
+  }
+
   public MaterializedField getField() {
     return container.getField();
   }

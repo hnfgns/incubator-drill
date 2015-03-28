@@ -17,6 +17,7 @@
  */
 package org.apache.drill.exec.vector.complex.impl;
 
+import org.apache.drill.exec.vector.AllocationHelper;
 import org.apache.drill.exec.vector.complex.WriteState;
 import org.apache.drill.exec.vector.complex.writer.FieldWriter;
 
@@ -32,6 +33,10 @@ abstract class AbstractBaseWriter implements FieldWriter{
     super();
     this.state = parent == null ? new WriteState() : parent.getState();
     this.parent = parent;
+  }
+
+  public void allocateEmpty(){
+    AllocationHelper.allocate(getVector(), 0, 0);
   }
 
   public FieldWriter getParent() {
