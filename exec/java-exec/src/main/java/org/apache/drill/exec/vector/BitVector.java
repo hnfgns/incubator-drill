@@ -42,6 +42,7 @@ public final class BitVector extends BaseDataValueVector implements FixedWidthVe
   private final Accessor accessor = new Accessor();
   private final Mutator mutator = new Mutator();
 
+  private int valueCount;
   private int allocationValueCount = INITIAL_VALUE_ALLOCATION;
   private int allocationMonitor = 0;
 

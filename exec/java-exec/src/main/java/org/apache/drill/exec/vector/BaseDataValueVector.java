@@ -18,55 +18,31 @@
 package org.apache.drill.exec.vector;
 
 import io.netty.buffer.DrillBuf;
-
-import java.util.Iterator;
-
 import org.apache.drill.exec.memory.BufferAllocator;
-import org.apache.drill.exec.proto.UserBitShared.SerializedField;
-import org.apache.drill.exec.record.DeadBuf;
 import org.apache.drill.exec.record.MaterializedField;
 
-import com.google.common.collect.Iterators;
 
-public abstract class BaseDataValueVector extends BaseValueVector{
+public abstract class BaseDataValueVector<V extends BaseValueVector<V, A, M>, A extends BaseValueVector.BaseAccessor,
+    M extends BaseValueVector.BaseMutator> extends BaseValueVector<V, A, M> {
+
+  private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(BaseValueVector.class);
 
   protected DrillBuf data;
-  protected int valueCount;
-  protected int currentValueCount;
 
   public BaseDataValueVector(MaterializedField field, BufferAllocator allocator) {
     super(field, allocator);
-
+    this.data = allocator.getEmpty();
   }
 
-  /**
-   * Release the underlying DrillBuf and reset the ValueVector
-   */
   @Override
   public void clear() {
-    if (data == null) {
-      data = DeadBuf.DEAD_BUFFER;
-    }
-    if (data != DeadBuf.DEAD_BUFFER) {
-      data.release();
-      data = data.getAllocator().getEmpty();
-      valueCount = 0;
-    }
+    data.release();
   }
-
-  public void setCurrentValueCount(int count) {
-    currentValueCount = count;
-  }
-
-  public int getCurrentValueCount() {
-    return currentValueCount;
-  }
-
 
   @Override
   public DrillBuf[] getBuffers(boolean clear) {
     DrillBuf[] out;
-    if (valueCount == 0) {
+    if (getBufferSize() == 0) {
       out = new DrillBuf[0];
     } else {
       out = new DrillBuf[]{data};
@@ -82,26 +58,14 @@ public abstract class BaseDataValueVector extends BaseValueVector{
   }
 
   public int getBufferSize() {
-    if (valueCount == 0) {
+    if (getAccessor().getValueCount() == 0) {
       return 0;
     }
     return data.writerIndex();
   }
 
-  @Override
-  public abstract SerializedField getMetadata();
-
-  public DrillBuf getData() {
+  public DrillBuf getBuffer() {
     return data;
-  }
-
-  public long getDataAddr() {
-    return data.memoryAddress();
-  }
-
-  @Override
-  public Iterator<ValueVector> iterator() {
-    return Iterators.emptyIterator();
   }
 
 }

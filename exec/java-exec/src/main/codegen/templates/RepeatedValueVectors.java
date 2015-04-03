@@ -76,14 +76,6 @@ public final class Repeated${minor.class}Vector extends BaseValueVector implemen
     return Math.min(values.getValueCapacity(), offsets.getValueCapacity() - 1);
   }
 
-  public int getCurrentValueCount() {
-    return values.getCurrentValueCount();
-  }
-
-  public void setCurrentValueCount(int count) {
-    values.setCurrentValueCount(offsets.getAccessor().get(count));
-  }
-  
   public int getBufferSize(){
     if(accessor.getGroupCount() == 0){
       return 0;
@@ -91,8 +83,8 @@ public final class Repeated${minor.class}Vector extends BaseValueVector implemen
     return offsets.getBufferSize() + values.getBufferSize();
   }
 
-  public DrillBuf getData(){
-      return values.getData();
+  public DrillBuf getBuffer(){
+      return values.getBuffer();
   }
   
   public TransferPair getTransferPair(){
