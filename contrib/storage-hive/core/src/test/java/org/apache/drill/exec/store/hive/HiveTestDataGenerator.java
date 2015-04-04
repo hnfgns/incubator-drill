@@ -21,12 +21,15 @@ package org.apache.drill.exec.store.hive;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.sql.Date;
 import java.sql.Timestamp;
 import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.drill.common.exceptions.DrillException;
+import org.apache.drill.common.exceptions.DrillRuntimeException;
 import org.apache.drill.exec.store.StoragePluginRegistry;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.hive.conf.HiveConf;
@@ -43,18 +46,36 @@ public class HiveTestDataGenerator {
   static int RETRIES = 5;
   private static final String HIVE_TEST_PLUGIN_NAME = "hive";
   private Driver hiveDriver = null;
-  private static final String DB_DIR = "/tmp/drill_hive_db";
-  private static final String WH_DIR = "/tmp/drill_hive_wh";
+  private static final String DEFAULT_DB_DIR = "/tmp/drill_hive_db";
+  private static final String DEFAULT_WH_DIR = "/tmp/drill_hive_wh";
+  private final String databaseDir;
+  private final String warehouseDir;
   private final StoragePluginRegistry pluginRegistry;
-
-  public HiveTestDataGenerator(StoragePluginRegistry pluginRegistry) {
-    this.pluginRegistry = pluginRegistry;
-  }
 
   // TODO: Remove this once hive related tests in exec/jdbc are moved to contrib/storage-hive/core module
   public HiveTestDataGenerator() {
     this(null);
   }
+
+  public HiveTestDataGenerator(StoragePluginRegistry pluginRegistry) {
+    this(pluginRegistry, false);
+  }
+
+  public HiveTestDataGenerator(StoragePluginRegistry pluginRegistry, boolean randomDirectory) {
+    this.pluginRegistry = pluginRegistry;
+    if (randomDirectory) {
+      try {
+        this.databaseDir = Files.createTempDirectory(getClass().getSimpleName()).toAbsolutePath().toString();
+        this.warehouseDir = Files.createTempDirectory(getClass().getSimpleName()).toAbsolutePath().toString();
+      } catch (IOException e) {
+        throw new DrillRuntimeException("unable to create temporary directory", e);
+      }
+    } else {
+      this.databaseDir = DEFAULT_DB_DIR;
+      this.warehouseDir = DEFAULT_WH_DIR;
+    }
+  }
+
 
   private void cleanDir(String dir) throws IOException{
     File f = new File(dir);
@@ -75,8 +96,8 @@ public class HiveTestDataGenerator {
     // add Hive plugin to given registry
     Map<String, String> config = Maps.newHashMap();
     config.put("hive.metastore.uris", "");
-    config.put("javax.jdo.option.ConnectionURL", String.format("jdbc:derby:;databaseName=%s;create=true", DB_DIR));
-    config.put("hive.metastore.warehouse.dir", WH_DIR);
+    config.put("javax.jdo.option.ConnectionURL", String.format("jdbc:derby:;databaseName=%s;create=true", databaseDir));
+    config.put("hive.metastore.warehouse.dir", warehouseDir);
     config.put(FileSystem.FS_DEFAULT_NAME_KEY, "file:///");
 
     HiveStoragePluginConfig pluginConfig = new HiveStoragePluginConfig(config);
@@ -112,19 +133,37 @@ public class HiveTestDataGenerator {
     pluginRegistry.deletePlugin(HIVE_TEST_PLUGIN_NAME);
   }
 
+  public void clear() {
+    // remove data from previous runs.
+    for (String path:new String[]{warehouseDir, databaseDir}) {
+      try {
+        cleanDir(path);
+      } catch (IOException e) {
+        logger.debug("unable to clean up %s", path);
+      }
+    }
+  }
+
   // TODO: Make this method private once hive related tests in exec/jdbc are moved to contrib/storage-hive/core module.
   // Tests in exec/jdbc just need the Hive metastore and test data and don't need adding storage plugin to registry.
   public void generateTestData() throws Exception {
+    // temporary hack to avoid removing paths until hive tests on jdbc side are migrated.
+    if (warehouseDir.equals(DEFAULT_WH_DIR)) {
+      if (Paths.get(warehouseDir).toFile().exists()) {
+        for (String path:new String[]{warehouseDir, databaseDir}) {
+          Paths.get(path).toFile().deleteOnExit();
+        }
+        return;
+      }
+    }
 
-    // remove data from previous runs.
-    cleanDir(DB_DIR);
-    cleanDir(WH_DIR);
+    clear();
 
     HiveConf conf = new HiveConf(SessionState.class);
 
-    conf.set("javax.jdo.option.ConnectionURL", String.format("jdbc:derby:;databaseName=%s;create=true", DB_DIR));
+    conf.set("javax.jdo.option.ConnectionURL", String.format("jdbc:derby:;databaseName=%s;create=true", databaseDir));
     conf.set(FileSystem.FS_DEFAULT_NAME_KEY, "file:///");
-    conf.set("hive.metastore.warehouse.dir", WH_DIR);
+    conf.set("hive.metastore.warehouse.dir", warehouseDir);
 
     SessionState ss = new SessionState(conf);
     SessionState.start(ss);
@@ -149,7 +188,7 @@ public class HiveTestDataGenerator {
     // create a table with no data
     executeQuery("CREATE TABLE IF NOT EXISTS default.empty_table(a INT, b STRING)");
     // delete the table location of empty table
-    File emptyTableLocation = new File(WH_DIR + "/empty_table");
+    File emptyTableLocation = new File(warehouseDir + "/empty_table");
     if (emptyTableLocation.exists()) {
       FileUtils.forceDelete(emptyTableLocation);
     }
