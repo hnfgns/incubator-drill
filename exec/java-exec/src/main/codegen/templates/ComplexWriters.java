@@ -87,7 +87,7 @@ public class ${eName}WriterImpl extends AbstractFieldWriter {
     if(ok()){
       // update to inform(addSafe) once available for all repeated vector types for holders.
       mutator.addSafe(idx(), h);
-      vector.setCurrentValueCount(idx());
+      vector.getMutator().setValueCount(idx());
     }
   }
   
@@ -95,7 +95,7 @@ public class ${eName}WriterImpl extends AbstractFieldWriter {
     if(ok()){
       // update to inform(addSafe) once available for all repeated vector types for holders.
       mutator.addSafe(idx(), h);
-      vector.setCurrentValueCount(idx());
+      vector.getMutator().setValueCount(idx());
     }
   }
 
@@ -104,7 +104,7 @@ public class ${eName}WriterImpl extends AbstractFieldWriter {
     if(ok()){
       // update to inform(setSafe) once available for all vector types for holders.
       mutator.addSafe(idx(), <#list fields as field>${field.name}<#if field_has_next>, </#if></#list>);
-      vector.setCurrentValueCount(idx());
+      vector.getMutator().setValueCount(idx());
     }
   }
   </#if>
@@ -122,14 +122,14 @@ public class ${eName}WriterImpl extends AbstractFieldWriter {
   public void write(${minor.class}Holder h){
     if(ok()){
       mutator.setSafe(idx(), h);
-      vector.setCurrentValueCount(idx());
+      vector.getMutator().setValueCount(idx());
     }
   }
   
   public void write(Nullable${minor.class}Holder h){
     if(ok()){
       mutator.setSafe(idx(), h);
-      vector.setCurrentValueCount(idx());
+      vector.getMutator().setValueCount(idx());
     }
   }
   
@@ -137,7 +137,7 @@ public class ${eName}WriterImpl extends AbstractFieldWriter {
   public void write${minor.class}(<#list fields as field>${field.type} ${field.name}<#if field_has_next>, </#if></#list>){
     if(ok()){
       mutator.setSafe(idx(), <#if mode == "Nullable">1, </#if><#list fields as field>${field.name}<#if field_has_next>, </#if></#list>);
-      vector.setCurrentValueCount(idx());
+      vector.getMutator().setValueCount(idx());
     }
   }
 
@@ -145,7 +145,7 @@ public class ${eName}WriterImpl extends AbstractFieldWriter {
   public void writeNull(){
     if(ok()){
       mutator.setNull(idx());
-      vector.setCurrentValueCount(idx());
+      vector.getMutator().setValueCount(idx());
     }
   }
   </#if>

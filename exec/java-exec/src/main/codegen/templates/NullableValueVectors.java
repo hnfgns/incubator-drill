@@ -50,7 +50,6 @@ public final class ${className} extends BaseDataValueVector implements <#if type
 
   private final FieldReader reader = new Nullable${minor.class}ReaderImpl(Nullable${minor.class}Vector.this);
 
-  private int valueCount;
   private final UInt1Vector bits = new UInt1Vector(MaterializedField.create(field + "_bits", Types.required(MinorType.UINT1)), allocator);
   private final ${valuesName} values = new ${minor.class}Vector(field, allocator);
   private final Mutator mutator = new Mutator();
@@ -69,14 +68,6 @@ public final class ${className} extends BaseDataValueVector implements <#if type
     return Math.min(bits.getValueCapacity(), values.getValueCapacity());
   }
 
-  public int getCurrentValueCount() {
-    return values.getCurrentValueCount();
-  }
-
-  public void setCurrentValueCount(int count) {
-    values.setCurrentValueCount(count);
-  }
-
   @Override
   public DrillBuf[] getBuffers(boolean clear) {
     DrillBuf[] buffers = ObjectArrays.concat(bits.getBuffers(clear), values.getBuffers(clear), DrillBuf.class);
@@ -88,7 +79,6 @@ public final class ${className} extends BaseDataValueVector implements <#if type
   
   @Override
   public void clear() {
-    valueCount = 0;
     bits.clear();
     values.clear();
   }
@@ -97,8 +87,9 @@ public final class ${className} extends BaseDataValueVector implements <#if type
     return values.getBufferSize() + bits.getBufferSize();
   }
 
-  public DrillBuf getData(){
-    return values.getData();
+  @Override
+  public DrillBuf getBuffer() {
+    return values.getBuffer();
   }
 
   public ${valuesName} getValuesVector() {
@@ -115,7 +106,7 @@ public final class ${className} extends BaseDataValueVector implements <#if type
   @Override
   public SerializedField getMetadata() {
     return getMetadataBuilder()
-             .setValueCount(valueCount)
+             .setValueCount(getAccessor().getValueCount())
              .setVarByteLength(values.getVarByteLength())
              .setBufferLength(getBufferSize())
              .build();
@@ -149,7 +140,6 @@ public final class ${className} extends BaseDataValueVector implements <#if type
   @Override
   public int load(int dataBytes, int valueCount, DrillBuf buf){
     clear();
-    this.valueCount = valueCount;
     int loaded = bits.load(valueCount, buf);
     
     // remove bits part of buffer.
@@ -178,13 +168,6 @@ public final class ${className} extends BaseDataValueVector implements <#if type
   }
 
   <#else>
-  @Override
-  public SerializedField getMetadata() {
-    return getMetadataBuilder()
-             .setValueCount(valueCount)
-             .setBufferLength(getBufferSize())
-             .build();
-  }
 
   @Override
   public void allocateNew() {
@@ -226,7 +209,6 @@ public final class ${className} extends BaseDataValueVector implements <#if type
   @Override
   public int load(int valueCount, DrillBuf buf){
     clear();
-    this.valueCount = valueCount;
     int loaded = bits.load(valueCount, buf);
     
     // remove bits part of buffer.
@@ -259,7 +241,6 @@ public final class ${className} extends BaseDataValueVector implements <#if type
   public void transferTo(Nullable${minor.class}Vector target){
     bits.transferTo(target.bits);
     values.transferTo(target.values);
-    target.valueCount = valueCount;
     <#if type.major == "VarLen">
     target.mutator.lastSet = mutator.lastSet;
     </#if>
@@ -269,7 +250,6 @@ public final class ${className} extends BaseDataValueVector implements <#if type
   public void splitAndTransferTo(int startIndex, int length, Nullable${minor.class}Vector target) {
     bits.splitAndTransferTo(startIndex, length, target.bits);
     values.splitAndTransferTo(startIndex, length, target.values);
-    target.valueCount = length;
     <#if type.major == "VarLen">
     target.mutator.lastSet = length - 1;
     </#if>
@@ -315,7 +295,6 @@ public final class ${className} extends BaseDataValueVector implements <#if type
   public ${minor.class}Vector convertToRequiredVector(){
     ${minor.class}Vector v = new ${minor.class}Vector(getField().getOtherNullableVersion(), allocator);
     v.data = values.data;
-    v.valueCount = this.valueCount;
     v.data.retain();
     clear();
     return v;
@@ -345,20 +324,6 @@ public final class ${className} extends BaseDataValueVector implements <#if type
     values.copyFromSafe(fromIndex, thisIndex, from.values);
   }
 
-  public long getDataAddr(){
-    return values.getDataAddr();
-  }
-  
-  public long getBitAddr(){
-    return bits.getDataAddr();
-  }
-  
-  <#if type.major == "VarLen">
-  public long getOffsetAddr(){
-    return values.getOffsetAddr();
-  }
-  </#if>
-  
   public final class Accessor extends BaseDataValueVector.BaseAccessor <#if type.major = "VarLen">implements VariableWidthVector.VariableWidthAccessor</#if> {
 
     final UInt1Vector.Accessor bAccessor = bits.getAccessor();
@@ -388,17 +353,7 @@ public final class ${className} extends BaseDataValueVector implements <#if type
     public long getStartEnd(int index){
       return vAccessor.getStartEnd(index);
     }
-    
-    public long getOffsetAddr(){
-      return values.getOffsetAddr();
-    }
-    </#if>
-    
 
-    
-
-
-    <#if type.major == "VarLen">
     public int getValueLength(int index) {
       return values.getAccessor().getValueLength(index);
     }
@@ -434,7 +389,7 @@ public final class ${className} extends BaseDataValueVector implements <#if type
     </#if>
 
     public int getValueCount(){
-      return valueCount;
+      return values.getAccessor().getValueCount();
     }
     
     public void reset(){}
@@ -605,13 +560,8 @@ public final class ${className} extends BaseDataValueVector implements <#if type
       <#if type.major == "VarLen">
       fillEmpties(valueCount);
       </#if>
-      Nullable${minor.class}Vector.this.valueCount = valueCount;
       values.getMutator().setValueCount(valueCount);
       bits.getMutator().setValueCount(valueCount);
-    }
-    
-    public boolean noNulls(){
-      return valueCount == setCount;
     }
 
     public void generateTestData(int valueCount){
