@@ -448,21 +448,19 @@ public class RepeatedMapVector extends AbstractMapVector implements RepeatedFixe
 
     @Override
     public Object getObject(int index) {
-      List<Object> l = new JsonStringArrayList();
-      int end = offsets.getAccessor().get(index+1);
+      final List<Object> result = new JsonStringArrayList();
+      final int end = offsets.getAccessor().get(index+1);
       String fieldName;
       for (int i =  offsets.getAccessor().get(index); i < end; i++) {
-        Map<String, Object> vv = Maps.newLinkedHashMap();
+        final Map<String, Object> vv = Maps.newLinkedHashMap();
         for (MaterializedField field:getField().getChildren()) {
           fieldName = field.getLastName();
-          Object value = getChild(fieldName).getAccessor().getObject(i);
-          if (value != null) {
-            vv.put(fieldName, value);
-          }
+          final Object value = getChild(fieldName).getAccessor().getObject(i);
+          vv.put(fieldName, value);
         }
-        l.add(vv);
+        result.add(vv);
       }
-      return l;
+      return result;
     }
 
     @Override
