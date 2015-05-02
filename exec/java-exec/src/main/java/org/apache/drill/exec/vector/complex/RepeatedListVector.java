@@ -335,7 +335,11 @@ public class RepeatedListVector extends AbstractContainerVector
 
   @Override
   public <T extends ValueVector> AddOrGetResult<T> addOrGetVector(VectorDescriptor descriptor) {
-    return delegate.addOrGetVector(descriptor);
+    final AddOrGetResult<T> result = delegate.addOrGetVector(descriptor);
+    if (result.isCreated() && callBack != null) {
+      callBack.doWork();
+    }
+    return result;
   }
 
   @Override
@@ -412,9 +416,6 @@ public class RepeatedListVector extends AbstractContainerVector
   @Override
   public <T extends ValueVector> T addOrGet(String name, MajorType type, Class<T> clazz) {
     final AddOrGetResult<T> result = addOrGetVector(VectorDescriptor.create(type));
-    if (result.isCreated() && callBack != null) {
-      callBack.doWork();
-    }
     return result.getVector();
   }
 

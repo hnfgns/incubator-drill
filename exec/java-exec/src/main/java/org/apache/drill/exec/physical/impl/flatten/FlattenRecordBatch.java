@@ -126,13 +126,13 @@ public class FlattenRecordBatch extends AbstractSingleRecordBatch<FlattenPOP> {
 
   private void setFlattenVector() {
     try {
-      flattener.setFlattenField((RepeatedValueVector) incoming.getValueAccessorById(
-          incoming.getSchema().getColumn(
-              incoming.getValueVectorId(
-                  popConfig.getColumn()).getFieldIds()[0]).getValueClass(),
-          incoming.getValueVectorId(popConfig.getColumn()).getFieldIds()).getValueVector());
+      final TypedFieldId typedFieldId = incoming.getValueVectorId(popConfig.getColumn());
+      final MaterializedField field = incoming.getSchema().getColumn(typedFieldId.getFieldIds()[0]);
+      final RepeatedValueVector vector = RepeatedValueVector.class.cast(incoming.getValueAccessorById(
+          field.getValueClass(), typedFieldId.getFieldIds()).getValueVector());
+      flattener.setFlattenField(vector);
     } catch (Exception ex) {
-      throw new DrillRuntimeException("Trying to flatten a non-repeated filed.");
+      throw new DrillRuntimeException("Trying to flatten a non-repeated field.");
     }
   }
 
@@ -175,7 +175,7 @@ public class FlattenRecordBatch extends AbstractSingleRecordBatch<FlattenPOP> {
   }
 
   private void handleRemainder() {
-    int remainingRecordCount = flattener.getFlattenField().getAccessor().getValueCount() - remainderIndex;
+    int remainingRecordCount = flattener.getFlattenField().getAccessor().getInnerValueCount() - remainderIndex;
     if (!doAlloc()) {
       outOfMemory = true;
       return;
