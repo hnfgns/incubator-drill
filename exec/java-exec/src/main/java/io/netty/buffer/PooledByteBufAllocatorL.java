@@ -37,7 +37,7 @@ public class PooledByteBufAllocatorL extends PooledByteBufAllocator{
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(PooledByteBufAllocatorL.class);
 
   private static final org.slf4j.Logger memoryLogger = org.slf4j.LoggerFactory.getLogger("drill.allocator");
-  private static final int MEMORY_LOGGER_FREQUENCY_SECONDS = 60;
+  private static final int MEMORY_LOGGER_FREQUENCY_SECONDS = 15;
 
   private static final String METRIC_PREFIX = "drill.allocator.";
   public static final PooledByteBufAllocatorL DEFAULT = new PooledByteBufAllocatorL();
