@@ -199,7 +199,15 @@ public class PooledByteBufAllocatorL extends PooledByteBufAllocator{
     @Override
     public void run() {
       while (true) {
-        memoryLogger.trace("Memory Usage: \n{}", PooledByteBufAllocatorL.this.toString());
+        final Thread realWorker = new Thread(new Runnable() {
+          @Override
+          public void run() {
+            memoryLogger.trace("Memory Usage: \n{}", PooledByteBufAllocatorL.this.toString());
+          }
+        });
+        realWorker.setDaemon(true);
+        realWorker.setName("allocation.logger.worker");
+        realWorker.start();
         try {
           Thread.sleep(MEMORY_LOGGER_FREQUENCY_SECONDS * 1000);
         } catch (InterruptedException e) {
