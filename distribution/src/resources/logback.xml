@@ -16,14 +16,14 @@
  limitations under the License.
 -->
 <configuration>
-  <!--  <appender name="SOCKET"
+  <appender name="SOCKET"
     class="de.huxhorn.lilith.logback.appender.ClassicMultiplexSocketAppender">
     <Compressing>true</Compressing>
     <ReconnectionDelay>10000</ReconnectionDelay>
     <IncludeCallerData>true</IncludeCallerData>
     <RemoteHosts>${LILITH_HOSTNAME:-localhost}</RemoteHosts>
   </appender>
-   -->
+
    
   <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
     <encoder>
@@ -51,6 +51,12 @@
   <logger name="org.apache.drill" additivity="false">
     <level value="info" />
     <appender-ref ref="FILE" />
+  </logger>
+
+  <logger name="drill.allocator" additivity="false">
+    <level value="trace" />
+    <appender-ref ref="FILE" />
+    <appender-ref ref="SOCKET" />
   </logger>
 
   <!-- 

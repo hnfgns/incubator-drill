@@ -64,6 +64,28 @@ public class PooledByteBufAllocatorL extends PooledByteBufAllocator{
     }
 
     if (memoryLogger.isTraceEnabled()) {
+      final Thread allocationThread = new Thread(new Runnable() {
+        final PooledByteBufAllocatorL allocator = PooledByteBufAllocatorL.this;
+        @Override
+        public void run() {
+          try {
+            Thread.sleep(5000);
+            final ByteBuf buffer = allocator.directBuffer(allocator.directArenas[0].chunkSize);
+            if (buffer.hasMemoryAddress()) {
+              memoryLogger.trace("fake buffer addr: {}", buffer.memoryAddress());
+            } else {
+              memoryLogger.trace("fake buffer array offset: {}", buffer.arrayOffset());
+            }
+            Thread.sleep(20000);
+            buffer.release();
+          } catch (InterruptedException e) {
+            e.printStackTrace();
+          }
+        }
+      });
+      allocationThread.setName("poc.fake.allocator");
+      allocationThread.setDaemon(true);
+      allocationThread.start();
       statusThread = new MemoryStatusThread();
       statusThread.start();
     } else {
