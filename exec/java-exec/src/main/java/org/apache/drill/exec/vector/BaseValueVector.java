@@ -56,7 +56,7 @@ public abstract class BaseValueVector<A extends ValueVector.Accessor, M extends 
   }
 
   public MaterializedField getField(FieldReference ref){
-    return getField().clone(ref);
+    return getField().withPath(ref);
   }
 
   @Override
