@@ -19,6 +19,7 @@ package org.apache.drill.exec.vector.complex;
 
 import io.netty.buffer.DrillBuf;
 
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -526,7 +527,13 @@ public class RepeatedMapVector extends AbstractMapVector implements RepeatedValu
 
     @Override
     public boolean isNull(int index) {
-      return false;
+      final Collection<String> children = getChildFieldNames();
+      for (final String child:children) {
+        if (!getChild(child).getAccessor().isNull(index)) {
+          return false;
+        }
+      }
+      return true;
     }
 
     public void get(int index, RepeatedMapHolder holder) {

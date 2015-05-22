@@ -78,7 +78,7 @@ public class SingleMapReaderImpl extends AbstractFieldReader{
 
   @Override
   public boolean isSet() {
-    return true;
+    return !vector.getAccessor().isNull(idx());
   }
 
   @Override

@@ -139,7 +139,7 @@ public class RepeatedListReaderImpl extends AbstractFieldReader{
   }
 
   public boolean isSet() {
-    return true;
+    return !container.getAccessor().isNull(idx());
   }
 
 }

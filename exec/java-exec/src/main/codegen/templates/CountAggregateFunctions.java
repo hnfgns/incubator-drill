@@ -37,15 +37,20 @@ import org.apache.drill.exec.expr.annotations.Output;
 import org.apache.drill.exec.expr.annotations.Param;
 import org.apache.drill.exec.expr.annotations.Workspace;
 import org.apache.drill.exec.expr.holders.*;
+import org.apache.drill.exec.vector.complex.reader.FieldReader;
 
 @SuppressWarnings("unused")
 
 public class CountFunctions {
   <#list countAggrTypes.countFunctionsInput as inputType>
   @FunctionTemplate(name = "count", scope = FunctionTemplate.FunctionScope.POINT_AGGREGATE)
-  public static class ${inputType}CountFunction implements DrillAggFunc {
+  public static class ${inputType.name}CountFunction implements DrillAggFunc {
 
-    @Param ${inputType}Holder in;
+    <#if inputType.kind == "flat">
+    @Param ${inputType.name}Holder in;
+    <#elseif inputType.kind == "nested">
+    @Param FieldReader in;
+    </#if>
     @Workspace BigIntHolder value;
     @Output BigIntHolder out;
 
@@ -57,12 +62,16 @@ public class CountFunctions {
 
     @Override
     public void add() {
-      <#if inputType?starts_with("Nullable")>
-        if (in.isSet == 1) {
-          value.value++;
-        }
-      <#else>
+      <#if inputType.name?starts_with("Nullable")>
+      if (in.isSet == 1) {
         value.value++;
+      }
+      <#elseif inputType.kind == "nested">
+      if (in.isSet()) {
+        value.value++;
+      }
+      <#else>
+      value.value++;
       </#if>
     }
 

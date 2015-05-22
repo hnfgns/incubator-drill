@@ -16,12 +16,6 @@
  * limitations under the License.
  */
 
-import java.lang.Override;
-
-import org.apache.drill.exec.record.TransferPair;
-import org.apache.drill.exec.vector.complex.BaseRepeatedValueVector;
-import org.mortbay.jetty.servlet.Holder;
-
 <@pp.dropOutputFile />
 <#list vv.types as type>
 <#list type.minor as minor>
@@ -289,6 +283,14 @@ public final class Repeated${minor.class}Vector extends BaseRepeatedValueVector 
            <#else>${minor.javaType!type.javaType}
            </#if> get(int index, int positionIndex) {
       return values.getAccessor().get(offsets.getAccessor().get(index) + positionIndex);
+    }
+
+    @Override
+    public boolean isNull(int index) {
+      final UInt4Vector.Accessor accessor = offsets.getAccessor();
+      final int begin = accessor.get(index);
+      final int end = accessor.get(index + 1);
+      return begin >= end;
     }
 
     public void get(int index, Repeated${minor.class}Holder holder){

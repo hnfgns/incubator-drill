@@ -212,7 +212,7 @@ public abstract class BaseRepeatedValueVector extends BaseValueVector implements
 
     @Override
     public boolean isNull(int index) {
-      return false;
+      return vector.getAccessor().isNull(index);
     }
 
     @Override

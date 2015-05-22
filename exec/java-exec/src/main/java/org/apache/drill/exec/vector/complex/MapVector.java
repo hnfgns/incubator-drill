@@ -22,6 +22,7 @@ import com.google.common.primitives.Ints;
 
 import io.netty.buffer.DrillBuf;
 
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -312,6 +313,16 @@ public class MapVector extends AbstractMapVector {
       return valueCount;
     }
 
+    @Override
+    public boolean isNull(int index) {
+      final Collection<String> children = getChildFieldNames();
+      for (final String child:children) {
+        if (!getChild(child).getAccessor().isNull(index)) {
+          return false;
+        }
+      }
+      return true;
+    }
   }
 
   public ValueVector getVectorById(int id) {
