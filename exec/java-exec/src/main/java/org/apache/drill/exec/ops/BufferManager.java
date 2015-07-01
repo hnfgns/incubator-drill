@@ -20,6 +20,7 @@ package org.apache.drill.exec.ops;
 import com.carrotsearch.hppc.LongObjectOpenHashMap;
 import io.netty.buffer.DrillBuf;
 import org.apache.drill.exec.memory.BufferAllocator;
+import org.apache.drill.exec.vector.AllocationHelper;
 
 import java.io.Closeable;
 
@@ -74,7 +75,7 @@ public class BufferManager implements AutoCloseable {
   }
 
   public DrillBuf getManagedBuffer(int size) {
-    DrillBuf newBuf = allocator.buffer(size);
+    DrillBuf newBuf = AllocationHelper.allocateUnchecked(allocator, size);
     managedBuffers.put(newBuf.memoryAddress(), newBuf);
     newBuf.setFragmentContext(fragmentContext);
     newBuf.setBufferManager(this);

@@ -32,6 +32,7 @@ import org.apache.drill.exec.store.parquet.DirectCodecFactory;
 import org.apache.drill.exec.store.parquet.DirectCodecFactory.ByteBufBytesInput;
 import org.apache.drill.exec.store.parquet.DirectCodecFactory.DirectBytesDecompressor;
 import org.apache.drill.exec.store.parquet.ParquetFormatPlugin;
+import org.apache.drill.exec.vector.AllocationHelper;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -300,14 +301,14 @@ final class PageReader {
    */
   private void allocatePageData(int size) {
     Preconditions.checkArgument(pageData == null);
-    pageData = parentColumnReader.parentReader.getOperatorContext().getAllocator().buffer(size);
+    pageData = AllocationHelper.allocateUnchecked(parentColumnReader.parentReader.getOperatorContext().getAllocator(), size);
   }
 
   /**
    * Allocate a buffer which the user should release immediately. The reader does not manage release of these buffers.
    */
   private DrillBuf allocateTemporaryBuffer(int size) {
-    return parentColumnReader.parentReader.getOperatorContext().getAllocator().buffer(size);
+    return AllocationHelper.allocateUnchecked(parentColumnReader.parentReader.getOperatorContext().getAllocator(), size);
   }
 
   /**
@@ -315,7 +316,7 @@ final class PageReader {
    * reader is cleared.
    */
   private DrillBuf allocateDictionaryBuffer(int size) {
-    DrillBuf buf = parentColumnReader.parentReader.getOperatorContext().getAllocator().buffer(size);
+    DrillBuf buf = AllocationHelper.allocateUnchecked(parentColumnReader.parentReader.getOperatorContext().getAllocator(), size);
     allocatedDictionaryBuffers.add(buf);
     return buf;
   }

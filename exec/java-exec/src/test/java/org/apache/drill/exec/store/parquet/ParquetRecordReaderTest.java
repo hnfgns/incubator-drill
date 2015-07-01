@@ -55,6 +55,7 @@ import org.apache.drill.exec.server.DrillbitContext;
 import org.apache.drill.exec.store.CachedSingleFileSystem;
 import org.apache.drill.exec.store.TestOutputMutator;
 import org.apache.drill.exec.store.parquet.columnreaders.ParquetRecordReader;
+import org.apache.drill.exec.vector.AllocationHelper;
 import org.apache.drill.exec.vector.BigIntVector;
 import org.apache.drill.exec.vector.NullableBigIntVector;
 import org.apache.drill.exec.vector.ValueVector;
@@ -361,7 +362,7 @@ public class ParquetRecordReaderTest extends BaseTestQuery {
 
     @Override
     public DrillBuf getManagedBuffer() {
-      return allocator.buffer(255);
+      return AllocationHelper.allocateUnchecked(allocator, 255);
     }
   }
 

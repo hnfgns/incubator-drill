@@ -28,6 +28,7 @@ import org.apache.drill.common.config.DrillConfig;
 import org.apache.drill.exec.memory.TopLevelAllocator;
 
 import com.google.common.collect.Lists;
+import org.apache.drill.exec.vector.AllocationHelper;
 
 public class TestMemoryRetention {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(TestMemoryRetention.class);
@@ -94,7 +95,7 @@ public class TestMemoryRetention {
       logger.info("Starting alloc.");
       final List<DrillBuf> bufs = Lists.newLinkedList();
       for (Integer i : ALLOCATIONS) {
-        bufs.add(allocator.buffer(i));
+        bufs.add(AllocationHelper.allocateUnchecked(allocator, i));
       }
       Collections.shuffle(bufs);
       logger.info("Finished alloc.");

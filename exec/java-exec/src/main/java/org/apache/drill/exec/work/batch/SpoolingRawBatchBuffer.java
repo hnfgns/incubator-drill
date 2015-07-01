@@ -38,6 +38,7 @@ import org.apache.drill.exec.proto.ExecProtos;
 import org.apache.drill.exec.proto.helper.QueryIdHelper;
 import org.apache.drill.exec.record.RawFragmentBatch;
 import org.apache.drill.exec.store.LocalSyncableFileSystem;
+import org.apache.drill.exec.vector.AllocationHelper;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -417,7 +418,7 @@ public class SpoolingRawBatchBuffer extends BaseRawBatchBuffer<SpoolingRawBatchB
         Thread.sleep(duration);
 
         try(final FSDataInputStream stream = fs.open(path);
-            final DrillBuf buf = allocator.buffer(bodyLength)) {
+            final DrillBuf buf = AllocationHelper.allocateUnchecked(allocator, bodyLength)) {
           stream.seek(start);
           final long currentPos = stream.getPos();
           final long check = stream.readLong();

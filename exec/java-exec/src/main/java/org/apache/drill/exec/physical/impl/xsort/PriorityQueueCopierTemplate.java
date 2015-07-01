@@ -49,7 +49,7 @@ public abstract class PriorityQueueCopierTemplate implements PriorityQueueCopier
     this.outgoing = outgoing;
     this.size = batchGroups.size();
 
-    final DrillBuf drillBuf = allocator.buffer(4 * size);
+    final DrillBuf drillBuf = AllocationHelper.allocateUnchecked(allocator, 4 * size);
     vector4 = new SelectionVector4(drillBuf, size, Character.MAX_VALUE);
     doSetup(context, hyperBatch, outgoing);
 

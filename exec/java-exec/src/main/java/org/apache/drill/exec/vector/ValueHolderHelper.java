@@ -126,7 +126,7 @@ public class ValueHolderHelper {
     byte[] b = s.getBytes(Charsets.UTF_8);
     vch.start = 0;
     vch.end = b.length;
-    vch.buffer = a.buffer(b.length); //
+    vch.buffer = AllocationHelper.allocateUnchecked(a, b.length); //
     vch.buffer.setBytes(0, b);
     return vch;
   }

@@ -36,6 +36,7 @@ import org.apache.drill.exec.memory.BufferAllocator;
 import org.apache.drill.exec.memory.TopLevelAllocator;
 import org.apache.drill.exec.server.Drillbit;
 import org.apache.drill.exec.server.RemoteServiceSet;
+import org.apache.drill.exec.vector.AllocationHelper;
 import org.apache.drill.test.DrillTest;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -118,7 +119,7 @@ public class TestResourceLeak extends DrillTest {
     public void setup() {}
 
     public void eval() {
-      buf.getAllocator().buffer(1);
+      AllocationHelper.allocateUnchecked(buf.getAllocator(), 1);
       out.value = in.value;
     }
 

@@ -17,6 +17,11 @@
  */
 package org.apache.drill.exec.vector;
 
+import com.google.common.base.Preconditions;
+import io.netty.buffer.DrillBuf;
+import org.apache.drill.exec.memory.BufferAllocator;
+import org.apache.drill.exec.memory.OutOfMemoryException;
+import org.apache.drill.exec.memory.OutOfMemoryRuntimeException;
 import org.apache.drill.exec.vector.complex.RepeatedFixedWidthVectorLike;
 import org.apache.drill.exec.vector.complex.RepeatedVariableWidthVectorLike;
 
@@ -56,6 +61,38 @@ public class AllocationHelper {
       ((FixedWidthVector) v).allocateNew(valueCount);
     } else {
       v.allocateNew();
+    }
+  }
+
+  public static DrillBuf allocateUnchecked(BufferAllocator allocator, int size) {
+    try {
+      return Preconditions.checkNotNull(allocator, "allocator cannot be null").buffer(size);
+    } catch (OutOfMemoryException e) {
+      throw new OutOfMemoryRuntimeException(e);
+    }
+  }
+
+  public static class AllocationResult {
+    public static final AllocationResult FAILURE = new AllocationResult(null);
+    public final DrillBuf buffer;
+    private AllocationResult(DrillBuf buffer) {
+      this.buffer = buffer;
+    }
+
+    public boolean isSuccess() {
+      return buffer != null;
+    }
+
+    public static AllocationResult create(DrillBuf buffer) {
+      return new AllocationResult(buffer);
+    }
+  }
+
+  public static AllocationResult allocateSilently(BufferAllocator allocator, int size) {
+    try {
+      return AllocationResult.create(Preconditions.checkNotNull(allocator, "allocator cannot be null").buffer(size));
+    } catch (OutOfMemoryException e) {
+      return AllocationResult.FAILURE;
     }
   }
 

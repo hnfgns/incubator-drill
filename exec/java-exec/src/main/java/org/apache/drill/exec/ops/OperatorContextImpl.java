@@ -28,6 +28,7 @@ import org.apache.drill.exec.physical.base.PhysicalOperator;
 import com.carrotsearch.hppc.LongObjectOpenHashMap;
 import org.apache.drill.exec.testing.ExecutionControls;
 import org.apache.drill.exec.store.dfs.DrillFileSystem;
+import org.apache.drill.exec.vector.AllocationHelper;
 import org.apache.hadoop.conf.Configuration;
 
 import java.io.IOException;
@@ -75,7 +76,7 @@ class OperatorContextImpl extends OperatorContext implements AutoCloseable {
   }
 
   public DrillBuf getManagedBuffer(int size) {
-    DrillBuf newBuf = allocator.buffer(size);
+    DrillBuf newBuf = AllocationHelper.allocateUnchecked(allocator, size);
     managedBuffers.put(newBuf.memoryAddress(), newBuf);
     newBuf.setOperatorContext(this);
     return newBuf;

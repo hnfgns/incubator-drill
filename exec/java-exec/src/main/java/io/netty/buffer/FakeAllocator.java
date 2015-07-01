@@ -32,12 +32,12 @@ class FakeAllocator implements BufferAllocator {
   public static final BufferAllocator FAKE_ALLOCATOR = new FakeAllocator();
 
   @Override
-  public DrillBuf buffer(int size) {
+  public DrillBuf buffer(int size) throws OutOfMemoryException {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public DrillBuf buffer(int minSize, int maxSize) {
+  public DrillBuf buffer(int minSize, int maxSize) throws OutOfMemoryException {
     throw new UnsupportedOperationException();
   }
 

@@ -24,6 +24,7 @@ import java.util.List;
 import org.apache.drill.exec.proto.UserBitShared.RecordBatchDef;
 import org.apache.drill.exec.proto.UserBitShared.SerializedField;
 import org.apache.drill.exec.record.BatchSchema.SelectionVectorMode;
+import org.apache.drill.exec.vector.AllocationHelper;
 import org.apache.drill.exec.vector.ValueVector;
 
 import com.google.common.base.Preconditions;
@@ -67,7 +68,7 @@ public class WritableBatch {
         len += b.capacity();
       }
 
-      DrillBuf newBuf = buffers[0].getAllocator().buffer(len);
+      DrillBuf newBuf = AllocationHelper.allocateUnchecked(buffers[0].getAllocator(), len);
       try {
         /* Copy data from each buffer into the compound buffer */
         int offset = 0;

@@ -29,6 +29,7 @@ import org.apache.drill.exec.memory.BufferAllocator;
 import org.apache.drill.exec.memory.OutOfMemoryRuntimeException;
 import org.apache.drill.exec.ops.OperatorContext;
 
+import org.apache.drill.exec.vector.AllocationHelper;
 import parquet.bytes.ByteBufferAllocator;
 
 public class ParquetDirectByteBufferAllocator implements ByteBufferAllocator {
@@ -48,10 +49,7 @@ public class ParquetDirectByteBufferAllocator implements ByteBufferAllocator {
 
   @Override
   public ByteBuffer allocate(int sz) {
-    ByteBuf bb = allocator.buffer(sz);
-    if (bb == null) {
-      throw new OutOfMemoryRuntimeException();
-    }
+    final ByteBuf bb = AllocationHelper.allocateUnchecked(allocator, sz);
     ByteBuffer b = bb.nioBuffer(0, sz);
     allocatedBuffers.put(System.identityHashCode(b), bb);
     logger.debug("ParquetDirectByteBufferAllocator: Allocated "+sz+" bytes. Allocated ByteBuffer id: "+System.identityHashCode(b));

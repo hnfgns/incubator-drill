@@ -19,6 +19,7 @@
 import java.lang.Override;
 
 import org.apache.drill.exec.memory.OutOfMemoryRuntimeException;
+import org.apache.drill.exec.vector.AllocationHelper;
 import org.apache.drill.exec.vector.BaseDataValueVector;
 import org.apache.drill.exec.vector.BaseValueVector;
 import org.apache.drill.exec.vector.VariableWidthVector;
@@ -293,11 +294,11 @@ public final class ${minor.class}Vector extends BaseDataValueVector implements V
      */
     boolean success = false;
     try {
-      DrillBuf newBuf = allocator.buffer(allocationTotalByteCount);
-      if (newBuf == null) {
+      final AllocationHelper.AllocationResult result = AllocationHelper.allocateSilently(allocator, allocationTotalByteCount);
+      if (!result.isSuccess()) {
         return false;
       }
-      this.data = newBuf;
+      this.data = result.buffer;
       if (!offsetVector.allocateNewSafe()) {
         return false;
       }
@@ -316,11 +317,7 @@ public final class ${minor.class}Vector extends BaseDataValueVector implements V
     clear();
     assert totalBytes >= 0;
     try {
-      DrillBuf newBuf = allocator.buffer(totalBytes);
-      if (newBuf == null) {
-        throw new OutOfMemoryRuntimeException(String.format("Failure while allocating buffer of %d bytes", totalBytes));
-      }
-      this.data = newBuf;
+      data = AllocationHelper.allocateUnchecked(allocator, totalBytes);
       offsetVector.allocateNew(valueCount + 1);
     } catch (OutOfMemoryRuntimeException e) {
       clear();
@@ -333,12 +330,7 @@ public final class ${minor.class}Vector extends BaseDataValueVector implements V
 
     public void reAlloc() {
       allocationTotalByteCount *= 2;
-      DrillBuf newBuf = allocator.buffer(allocationTotalByteCount);
-      if(newBuf == null){
-        throw new OutOfMemoryRuntimeException(
-          String.format("Failure while reallocating buffer of %d bytes", allocationTotalByteCount));
-      }
-
+      final DrillBuf newBuf = AllocationHelper.allocateUnchecked(allocator, allocationTotalByteCount);
       newBuf.setBytes(0, data, 0, data.capacity());
       data.release();
       data = newBuf;

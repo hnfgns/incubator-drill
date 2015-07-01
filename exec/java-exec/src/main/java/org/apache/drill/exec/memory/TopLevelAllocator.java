@@ -88,12 +88,12 @@ public class TopLevelAllocator implements BufferAllocator {
     return acct.transferIn(b, b.capacity());
   }
 
-  public DrillBuf buffer(int min, int max) {
+  public DrillBuf buffer(int min, int max) throws OutOfMemoryException {
     if (min == 0) {
       return empty;
     }
     if(!acct.reserve(min)) {
-      return null;
+      throw new OutOfMemoryException(String.format("Unable to allocate requested %s bytes. Ran out of memory.", min));
     }
 
     try {
@@ -104,7 +104,7 @@ public class TopLevelAllocator implements BufferAllocator {
     } catch (OutOfMemoryError e) {
       if ("Direct buffer memory".equals(e.getMessage())) {
         acct.release(min);
-        return null;
+        throw new OutOfMemoryException(String.format("Unable to allocate requested %s bytes. Ran out of memory.", min));
       } else {
         throw e;
       }
@@ -112,7 +112,7 @@ public class TopLevelAllocator implements BufferAllocator {
   }
 
   @Override
-  public DrillBuf buffer(int size) {
+  public DrillBuf buffer(int size) throws OutOfMemoryException {
     return buffer(size, size);
   }
 
@@ -234,7 +234,7 @@ public class TopLevelAllocator implements BufferAllocator {
     }
 
     @Override
-    public DrillBuf buffer(int size, int max) {
+    public DrillBuf buffer(int size, int max) throws OutOfMemoryException {
       if (ENABLE_ACCOUNTING) {
         try {
           injector.injectUnchecked(fragmentContext, CHILD_BUFFER_INJECTION_SITE);
@@ -269,7 +269,7 @@ public class TopLevelAllocator implements BufferAllocator {
       }
     }
 
-    public DrillBuf buffer(int size) {
+    public DrillBuf buffer(int size)  throws OutOfMemoryException {
       return buffer(size, size);
     }
 

@@ -31,6 +31,7 @@ import org.apache.drill.exec.ops.FragmentContext;
 import org.apache.drill.exec.record.RecordBatch;
 import org.apache.drill.exec.record.VectorContainer;
 import org.apache.drill.exec.record.selection.SelectionVector4;
+import org.apache.drill.exec.vector.AllocationHelper;
 import org.apache.hadoop.util.IndexedSortable;
 
 import com.google.common.base.Preconditions;
@@ -74,7 +75,7 @@ public abstract class MSortTemplate implements MSorter, IndexedSortable{
         throw new UnsupportedOperationException("Missing batch");
       }
     }
-    final DrillBuf drillBuf = allocator.buffer(4 * totalCount);
+    final DrillBuf drillBuf = AllocationHelper.allocateUnchecked(allocator, 4 * totalCount);
 
     try {
       desiredRecordBatchCount = context.getConfig().getInt(ExecConstants.EXTERNAL_SORT_MSORT_MAX_BATCHSIZE);

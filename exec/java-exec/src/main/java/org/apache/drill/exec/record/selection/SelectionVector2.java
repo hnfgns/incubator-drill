@@ -24,6 +24,7 @@ import java.io.IOException;
 
 import org.apache.drill.exec.memory.BufferAllocator;
 import org.apache.drill.exec.record.DeadBuf;
+import org.apache.drill.exec.vector.AllocationHelper;
 
 /**
  * A selection vector that fronts, at most, a
@@ -92,10 +93,11 @@ public class SelectionVector2 implements Closeable{
 
   public boolean allocateNew(int size){
     clear();
-    buffer = allocator.buffer(size * RECORD_SIZE);
-    if (buffer == null) {
+    final AllocationHelper.AllocationResult result = AllocationHelper.allocateSilently(allocator, size * RECORD_SIZE);
+    if (!result.isSuccess()) {
       return false;
     }
+    buffer = result.buffer;
     return true;
   }
 

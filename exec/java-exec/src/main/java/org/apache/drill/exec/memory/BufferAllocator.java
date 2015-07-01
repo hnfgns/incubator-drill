@@ -40,7 +40,7 @@ public interface BufferAllocator extends Closeable {
    *          The size in bytes.
    * @return A new ByteBuf.
    */
-  public abstract DrillBuf buffer(int size);
+  public abstract DrillBuf buffer(int size) throws OutOfMemoryException;
 
   /**
    * Allocate a new or reused buffer within provided range. Note that the buffer may technically be larger than the
@@ -50,7 +50,7 @@ public interface BufferAllocator extends Closeable {
    * @param maxSize The maximum size in bytes.
    * @return A new ByteBuf.
    */
-  public abstract DrillBuf buffer(int minSize, int maxSize);
+  public abstract DrillBuf buffer(int minSize, int maxSize) throws OutOfMemoryException;
 
   public abstract ByteBufAllocator getUnderlyingAllocator();
 

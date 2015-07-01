@@ -21,6 +21,7 @@ import static org.junit.Assert.assertEquals;
 import io.netty.buffer.ByteBuf;
 
 import org.apache.drill.exec.ExecTest;
+import org.apache.drill.exec.vector.AllocationHelper;
 import org.junit.Test;
 
 
@@ -30,7 +31,7 @@ public class TestEndianess extends ExecTest{
   @Test
   public void testLittleEndian(){
     TopLevelAllocator a = new TopLevelAllocator(Long.MAX_VALUE);
-    ByteBuf b = a.buffer(4);
+    ByteBuf b = AllocationHelper.allocateUnchecked(a, 4);
     b.setInt(0, 35);
     assertEquals((int) b.getByte(0), 35);
     assertEquals((int) b.getByte(1), 0);

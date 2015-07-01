@@ -92,13 +92,12 @@ public final class ${minor.class}Vector extends BaseDataValueVector implements F
       allocationValueCount = (int) (allocationValueCount * 2);
       allocationMonitor = 0;
     }
-
-    DrillBuf newBuf = allocator.buffer(allocationValueCount * ${type.width});
-    if(newBuf == null) {
+    final int numBytes = allocationValueCount * ${type.width};
+    final AllocationHelper.AllocationResult result = AllocationHelper.allocateSilently(allocator, numBytes);
+    if (!result.isSuccess()) {
       return false;
     }
-
-    this.data = newBuf;
+    this.data = result.buffer;
     this.data.readerIndex(0);
     return true;
   }
@@ -111,13 +110,8 @@ public final class ${minor.class}Vector extends BaseDataValueVector implements F
   public void allocateNew(int valueCount) {
     clear();
 
-    DrillBuf newBuf = allocator.buffer(valueCount * ${type.width});
-    if (newBuf == null) {
-      throw new OutOfMemoryRuntimeException(
-        String.format("Failure while allocating buffer of %d bytes",valueCount * ${type.width}));
-    }
-
-    this.data = newBuf;
+    final int numBytes = valueCount * ${type.width};
+    this.data = AllocationHelper.allocateUnchecked(allocator, numBytes);
     this.data.readerIndex(0);
     this.allocationValueCount = valueCount;
   }
@@ -130,12 +124,8 @@ public final class ${minor.class}Vector extends BaseDataValueVector implements F
   public void reAlloc() {
     logger.info("Realloc vector {}. [{}] -> [{}]", field, allocationValueCount * ${type.width}, allocationValueCount * 2 * ${type.width});
     allocationValueCount *= 2;
-    DrillBuf newBuf = allocator.buffer(allocationValueCount * ${type.width});
-    if (newBuf == null) {
-      throw new OutOfMemoryRuntimeException(
-      String.format("Failure while reallocating buffer to %d bytes",allocationValueCount * ${type.width}));
-    }
-
+    final int numBytes = allocationValueCount * ${type.width};
+    final DrillBuf newBuf = AllocationHelper.allocateUnchecked(allocator, numBytes);
     newBuf.setBytes(0, data, 0, data.capacity());
     newBuf.setZero(newBuf.capacity() / 2, newBuf.capacity() / 2);
     newBuf.writerIndex(data.writerIndex());

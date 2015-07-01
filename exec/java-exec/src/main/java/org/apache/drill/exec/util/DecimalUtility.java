@@ -27,6 +27,7 @@ import java.util.Arrays;
 import org.apache.drill.common.util.CoreDecimalUtility;
 import org.apache.drill.exec.expr.fn.impl.ByteFunctionHelpers;
 import org.apache.drill.exec.expr.holders.Decimal38SparseHolder;
+import org.apache.drill.exec.vector.AllocationHelper;
 
 public class DecimalUtility extends CoreDecimalUtility{
 
@@ -272,7 +273,7 @@ public class DecimalUtility extends CoreDecimalUtility{
         if (sign == true) {
             intermediateBytes[0] = (byte) (intermediateBytes[0] | 0x80);
         }
-        DrillBuf intermediate = data.getAllocator().buffer(intermediateBytes.length);
+        DrillBuf intermediate = AllocationHelper.allocateUnchecked(data.getAllocator(), intermediateBytes.length);
         intermediate.setBytes(0, intermediateBytes);
 
         BigDecimal ret = getBigDecimalFromIntermediate(intermediate, 0, nDecimalDigits + 1, scale);

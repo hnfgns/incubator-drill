@@ -113,9 +113,11 @@ public class VectorAccessibleSerializable extends AbstractStreamSerializable {
     for (SerializedField metaData : fieldList) {
       int dataLength = metaData.getBufferLength();
       MaterializedField field = MaterializedField.create(metaData);
-      DrillBuf buf = allocator.buffer(dataLength);
-      if (buf == null) {
-        throw new IOException(new OutOfMemoryException());
+      final DrillBuf buf;
+      try {
+        buf = allocator.buffer(dataLength);
+      } catch (OutOfMemoryException e) {
+        throw new IOException(e);
       }
       final ValueVector vector;
       try {

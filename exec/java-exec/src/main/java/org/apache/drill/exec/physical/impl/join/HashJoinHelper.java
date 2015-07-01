@@ -29,6 +29,7 @@ import org.apache.drill.exec.memory.BufferAllocator;
 import org.apache.drill.exec.ops.FragmentContext;
 import org.apache.drill.exec.physical.impl.common.HashTable;
 import org.apache.drill.exec.record.selection.SelectionVector4;
+import org.apache.drill.exec.vector.AllocationHelper;
 
 
 /*
@@ -108,8 +109,7 @@ public class HashJoinHelper {
 
   public SelectionVector4 getNewSV4(int recordCount) throws SchemaChangeException {
 
-    ByteBuf vector = allocator.buffer((recordCount * 4));
-
+    final ByteBuf vector = AllocationHelper.allocateUnchecked(allocator, recordCount * 4);
     SelectionVector4 sv4 = new SelectionVector4(vector, recordCount, recordCount);
 
     // Initialize the vector
