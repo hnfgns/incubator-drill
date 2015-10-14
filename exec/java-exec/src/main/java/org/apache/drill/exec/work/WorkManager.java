@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -90,6 +91,8 @@ public class WorkManager implements AutoCloseable {
    * How often the StatusThread collects statistics about running fragments.
    */
   private final static int STATUS_PERIOD_SECONDS = 5;
+  private final static String MAX_THREADS_PATH = "drill.exec.threads.max";
+  private final static int MIN_THREADS = Runtime.getRuntime().availableProcessors();
 
   public WorkManager(final BootStrapContext context) {
     this.bContext = context;
@@ -103,7 +106,11 @@ public class WorkManager implements AutoCloseable {
      * threads that can be created. Ideally, this might be computed based on the number of cores or
      * some similar metric; ThreadPoolExecutor can impose an upper bound, and might be a better choice.
      */
-    executor = new ThreadPoolExecutor(0, Integer.MAX_VALUE, 60L, TimeUnit.SECONDS, new SynchronousQueue<Runnable>(),
+    final int defaultMaxThreads = (int)(Runtime.getRuntime().availableProcessors() * 1.1);
+    final int maxThreads = bContext.getConfig().hasPath(MAX_THREADS_PATH) ?
+        Math.max(MIN_THREADS, bContext.getConfig().getInt(MAX_THREADS_PATH)) : defaultMaxThreads;
+    logger.info("max number of execution threads is {}", maxThreads);
+    executor = new ThreadPoolExecutor(0, maxThreads, 60L, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>(),
         new NamedThreadFactory("WorkManager-")) {
             @Override
             protected void afterExecute(final Runnable r, final Throwable t) {
