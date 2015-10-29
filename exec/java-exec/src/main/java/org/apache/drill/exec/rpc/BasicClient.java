@@ -77,6 +77,7 @@ public abstract class BasicClient<T extends EnumLite, R extends RemoteConnection
         .channel(TransportCheck.getClientSocketChannel()) //
         .option(ChannelOption.ALLOCATOR, alloc) //
         .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 30 * 1000)
+        .option(ChannelOption.SO_KEEPALIVE, true)
         .option(ChannelOption.SO_REUSEADDR, true)
         .option(ChannelOption.SO_RCVBUF, 1 << 17) //
         .option(ChannelOption.SO_SNDBUF, 1 << 17) //

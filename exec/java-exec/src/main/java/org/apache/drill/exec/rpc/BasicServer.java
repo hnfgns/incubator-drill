@@ -70,6 +70,7 @@ public abstract class BasicServer<T extends EnumLite, C extends RemoteConnection
         .channel(TransportCheck.getServerSocketChannel())
         .option(ChannelOption.SO_BACKLOG, 1000)
         .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 30*1000)
+        .option(ChannelOption.SO_KEEPALIVE, true)
         .option(ChannelOption.TCP_NODELAY, true)
         .option(ChannelOption.SO_REUSEADDR, true)
         .option(ChannelOption.SO_RCVBUF, 1 << 17)
