@@ -28,29 +28,14 @@ import java.io.IOException;
  * Implementation of EStore using Zookeeper's EPHEMERAL node.
  * @param <V>
  */
-public class ZkEStore<V> extends ZkAbstractStore<V> implements EStore<V>{
+public class ZkEStore<V> extends ZkAbstractStore<V> implements EStore<V> {
 
-  public ZkEStore(CuratorFramework framework, PStoreConfig<V> config) throws IOException{
+  public ZkEStore(CuratorFramework framework, PStoreConfig<V> config) throws IOException {
     super(framework,config);
   }
 
   @Override
-  public void delete(String key) {
-    try {
-      if (framework.checkExists().forPath(p(key)) != null) {
-        framework.delete().forPath(p(key));
-      }
-    } catch (Exception e) {
-      throw new RuntimeException("Failure while accessing Zookeeper. " + e.getMessage(), e);
-    }
-  }
-
-  @Override
-  public void createNodeInZK(String key, V value) {
-    try {
-      framework.create().withMode(CreateMode.EPHEMERAL).forPath(p(key), config.getSerializer().serialize(value));
-    } catch (Exception e) {
-      throw new RuntimeException("Failure while accessing Zookeeper", e);
-    }
+  protected CreateMode getCreateMode() {
+    return CreateMode.EPHEMERAL;
   }
 }
