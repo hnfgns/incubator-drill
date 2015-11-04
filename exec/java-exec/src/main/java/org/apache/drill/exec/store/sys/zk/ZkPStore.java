@@ -18,8 +18,11 @@
 package org.apache.drill.exec.store.sys.zk;
 
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.curator.framework.CuratorFramework;
+import org.apache.curator.framework.recipes.locks.InterProcessLock;
+import org.apache.curator.framework.recipes.locks.InterProcessMutex;
 import org.apache.drill.exec.store.sys.PStore;
 import org.apache.drill.exec.store.sys.PStoreConfig;
 import org.apache.zookeeper.CreateMode;
@@ -28,23 +31,14 @@ import org.apache.zookeeper.CreateMode;
  * Implementation of PStore using Zookeeper's PERSISTENT node.
  * @param <V>
  */
-public class ZkPStore<V> extends ZkAbstractStore<V> implements PStore<V>{
+public class ZkPStore<V> extends ZkAbstractStore<V> implements PStore<V> {
 
-  ZkPStore(CuratorFramework framework, PStoreConfig<V> config)
-      throws IOException {
+  public ZkPStore(CuratorFramework framework, PStoreConfig<V> config) throws IOException {
     super(framework, config);
   }
 
   @Override
-  public void createNodeInZK(String key, V value) {
-    try {
-      framework.create().withMode(CreateMode.PERSISTENT).forPath(p(key), config.getSerializer().serialize(value));
-    } catch (Exception e) {
-      throw new RuntimeException("Failure while accessing Zookeeper", e);
-    }
+  protected CreateMode getCreateMode() {
+    return CreateMode.PERSISTENT;
   }
-
-
-
-
 }
