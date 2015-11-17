@@ -19,82 +19,63 @@ package org.apache.drill.exec.store.dfs;
 
 import java.io.IOException;
 import java.net.URI;
-import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 
-import com.google.common.base.Stopwatch;
-import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.drill.exec.store.parquet.Metadata.ParquetTableMetadata_v1;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.google.common.base.Preconditions;
+import com.google.common.base.Predicate;
+import com.google.common.base.Strings;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.google.common.collect.Lists;
-
 /**
- * Jackson serializable description of a file selection. Maintains an internal set of file statuses. However, also
- * serializes out as a list of Strings. All accessing methods first regenerate the FileStatus objects if they are not
- * available.  This allows internal movement of FileStatus and the ability to serialize if need be.
+ * Jackson serializable description of a file selection.
  */
 public class FileSelection {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(FileSelection.class);
 
   @JsonIgnore
-  private List<FileStatus> statuses;
+  public List<FileStatus> statuses;
 
   public List<String> files;
   public String selectionRoot;
 
-  // this is a temporary location for the reference to Parquet metadata
-  // TODO: ideally this should be in a Parquet specific derived class.
-  private ParquetTableMetadata_v1 parquetMeta = null;
-
-  public FileSelection() {
-  }
-
-  public FileSelection(List<String> files, String selectionRoot, boolean dummy) {
-    this.files = files;
-    this.selectionRoot = selectionRoot;
-  }
-
-  public FileSelection(List<String> files, boolean dummy) {
-    this.files = files;
-  }
-
-  public FileSelection(List<FileStatus> statuses) {
-    this(statuses, null);
-  }
-
-  public FileSelection(List<String> files, String selectionRoot,
-      ParquetTableMetadata_v1 meta) {
-    this.files = files;
-    this.selectionRoot = selectionRoot;
-    this.parquetMeta = meta;
-  }
-
-  public FileSelection(List<FileStatus> statuses, String selectionRoot) {
+  protected FileSelection(List<FileStatus> statuses, List<String> files, String selectionRoot) {
+    final boolean bothNullOrEmpty = (statuses == null || statuses.size() == 0) && (files == null || files.size() == 0);
+    Preconditions.checkArgument(bothNullOrEmpty, "Either statuses or files must be supplied not both/node of them");
     this.statuses = statuses;
-    this.files = Lists.newArrayList();
-    for (FileStatus f : statuses) {
-      files.add(f.getPath().toString());
+    this.files = files;
+    this.selectionRoot = Preconditions.checkNotNull(selectionRoot);
+  }
+
+  public List<FileStatus> getStatuses(final DrillFileSystem fs) throws IOException {
+    if (statuses == null) {
+      final List<FileStatus> newStatuses = Lists.newArrayList(new FileStatus[files.size()]);
+      for (final String pathStr:files) {
+        newStatuses.add(fs.getFileStatus(new Path(pathStr)));
+      }
+      statuses = newStatuses;
     }
-    this.selectionRoot = selectionRoot;
+    return statuses;
   }
 
-  public FileSelection(List<String> files, String selectionRoot,
-                       ParquetTableMetadata_v1 meta, List<FileStatus> statuses) {
-    this.files = files;
-    this.selectionRoot = selectionRoot;
-    this.parquetMeta = meta;
-    this.statuses = statuses;
+  public List<String> getFiles() {
+    if (files == null) {
+      final List<String> newFiles = Lists.newArrayList(new String[statuses.size()]);
+      for (final FileStatus status:statuses) {
+        newFiles.add(status.getPath().toString());
+      }
+      files = newFiles;
+    }
+    return files;
   }
 
   public boolean containsDirectories(DrillFileSystem fs) throws IOException {
-    init(fs);
-    for (FileStatus p : statuses) {
-      if (p.isDirectory()) {
+    for (final FileStatus status : getStatuses(fs)) {
+      if (status.isDirectory()) {
         return true;
       }
     }
@@ -102,77 +83,33 @@ public class FileSelection {
   }
 
   public FileSelection minusDirectories(DrillFileSystem fs) throws IOException {
-    Stopwatch timer = new Stopwatch();
-    timer.start();
-    init(fs);
-    List<FileStatus> newList = Lists.newArrayList();
-    for (FileStatus p : statuses) {
-      if (p.isDirectory()) {
-        List<FileStatus> statuses = fs.list(true, p.getPath());
-        for (FileStatus s : statuses) {
-          newList.add(s);
-        }
-      } else {
-        newList.add(p);
-      }
+    final List<FileStatus> statuses = getStatuses(fs);
+    final int total = statuses.size();
+    final Path[] paths = new Path[total];
+    for (int i=0; i<total; i++) {
+      paths[i] = statuses.get(i).getPath();
     }
-    logger.info("FileSelection.minusDirectories() took {} ms, numFiles: {}",
-        timer.elapsed(TimeUnit.MILLISECONDS), newList.size());
-    return new FileSelection(newList, selectionRoot);
+    final List<FileStatus> allStats = fs.list(true, paths);
+    final List<FileStatus> nonDirectories = Lists.newArrayList(Iterables.filter(allStats, new Predicate<FileStatus>() {
+      @Override
+      public boolean apply(@Nullable FileStatus status) {
+        return !status.isDirectory();
+      }
+    }));
+
+    return create(nonDirectories, null, selectionRoot);
   }
 
   public FileStatus getFirstPath(DrillFileSystem fs) throws IOException {
-    init(fs);
-    return statuses.get(0);
+    return getStatuses(fs).get(0);
   }
 
-  public List<String> getAsFiles() {
-    if (!files.isEmpty()) {
-      return files;
-    }
-    if (statuses == null) {
-      return Collections.emptyList();
-    }
-    List<String> files = Lists.newArrayList();
-    for (FileStatus s : statuses) {
-      files.add(s.getPath().toString());
-    }
-    return files;
-  }
-
-  private void init(DrillFileSystem fs) throws IOException {
-    Stopwatch timer = new Stopwatch();
-    timer.start();
-    if (files != null && statuses == null) {
-      statuses = Lists.newArrayList();
-      for (String p : files) {
-        statuses.add(fs.getFileStatus(new Path(p)));
-      }
-    }
-    logger.info("FileSelection.init() took {} ms, numFiles: {}",
-        timer.elapsed(TimeUnit.MILLISECONDS), statuses == null ? 0 : statuses.size());
-  }
-
-  public List<FileStatus> getFileStatusList(DrillFileSystem fs) throws IOException {
-    init(fs);
-    return statuses;
-  }
-
-  /**
-   * Return the parquet table metadata that may have been read
-   * from a metadata cache file during creation of this file selection.
-   * It will always be null for non-parquet files and null for cases
-   * where no metadata cache was created.
-   */
-  public ParquetTableMetadata_v1 getParquetMetadata() {
-    return parquetMeta;
-  }
-
-  private static String commonPath(FileStatus... paths) {
+  private static String commonPath(List<FileStatus> statuses) {
     String commonPath = "";
-    String[][] folders = new String[paths.length][];
-    for (int i = 0; i < paths.length; i++) {
-      folders[i] = Path.getPathWithoutSchemeAndAuthority(paths[i].getPath()).toString().split("/");
+    final int total = statuses.size();
+    String[][] folders = new String[total][];
+    for (int i = 0; i < total; i++) {
+      folders[i] = Path.getPathWithoutSchemeAndAuthority(statuses.get(i).getPath()).toString().split("/");
     }
     for (int j = 0; j < folders[0].length; j++) {
       String thisFolder = folders[0][j];
@@ -190,22 +127,32 @@ public class FileSelection {
         break;
       }
     }
-    URI oneURI = paths[0].getPath().toUri();
+    URI oneURI = statuses.get(0).getPath().toUri();
     return new Path(oneURI.getScheme(), oneURI.getAuthority(), commonPath).toString();
   }
 
-  public static FileSelection create(DrillFileSystem fs, String parent, String path) throws IOException {
-    Path p = new Path(parent,removeLeadingSlash(path));
-    FileStatus[] status = fs.globStatus(p);
-    if (status == null || status.length == 0) {
+  public static FileSelection create(final DrillFileSystem fs, final String parent, final String path) throws IOException {
+    final Path combined = new Path(parent, removeLeadingSlash(path));
+    final FileStatus[] statuses = fs.globStatus(combined);
+    return create(Lists.newArrayList(statuses), null, combined.toUri().toString());
+  }
+
+  /**
+   * Creates a {@link FileSelection selection} out of given file statuses/files and selection root.
+   *
+   * @param statuses  list of file statuses
+   * @param files  list of files
+   * @param root  root path for selections
+   *
+   * @return  null if the list of statuses and files are null or empty
+   *          otherwise a new selection.
+   */
+  public static FileSelection create(final List<FileStatus> statuses, final List<String> files, final String root) {
+    if ((statuses == null || statuses.size() == 0) && (files == null || files.size() == 0)) {
       return null;
     }
-    if (status.length == 1) {
-      URI oneURI = status[0].getPath().toUri();
-      String selectionRoot = new Path(oneURI.getScheme(), oneURI.getAuthority(), p.toUri().getPath()).toString();
-      return new FileSelection(Collections.singletonList(status[0]), selectionRoot);
-    }
-    return new FileSelection(Lists.newArrayList(status), commonPath(status));
+    final String selectionRoot = Strings.isNullOrEmpty(root) ? commonPath(statuses) : root;
+    return new FileSelection(statuses, files, selectionRoot);
   }
 
   private static String removeLeadingSlash(String path) {
