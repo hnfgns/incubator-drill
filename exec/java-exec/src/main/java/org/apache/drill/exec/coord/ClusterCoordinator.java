@@ -22,6 +22,8 @@ import java.util.Collection;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.apache.drill.exec.coord.store.TransientStore;
+import org.apache.drill.exec.coord.store.TransientStoreConfig;
 import org.apache.drill.exec.proto.CoordinationProtos.DrillbitEndpoint;
 import org.apache.drill.exec.work.foreman.DrillbitStatusListener;
 
@@ -60,16 +62,23 @@ public abstract class ClusterCoordinator implements Closeable {
   public abstract DistributedSemaphore getSemaphore(String name, int maximumLeases);
 
   /**
+   * Returns a new {@link TransientStore store} instance with the given {@link TransientStoreConfig configuration}.
+   * @param config  store configuration
+   * @param <V>  value type for this store
+   */
+  public abstract <V> TransientStore<V> newTransientStore(TransientStoreConfig<V> config);
+
+  /**
    * Actions to take when there are a set of new de-active drillbits.
    * @param unregisteredBits
    */
-  public void drillbitUnregistered(Set<DrillbitEndpoint> unregisteredBits) {
+  protected void drillbitUnregistered(Set<DrillbitEndpoint> unregisteredBits) {
     for (DrillbitStatusListener listener : listeners.keySet()) {
       listener.drillbitUnregistered(unregisteredBits);
     }
   }
 
-  public void drillbitRegistered(Set<DrillbitEndpoint> registeredBits) {
+  protected void drillbitRegistered(Set<DrillbitEndpoint> registeredBits) {
     for (DrillbitStatusListener listener : listeners.keySet()) {
       listener.drillbitRegistered(registeredBits);
     }

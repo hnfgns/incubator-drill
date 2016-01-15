@@ -28,6 +28,8 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.drill.exec.coord.ClusterCoordinator;
 import org.apache.drill.exec.coord.DistributedSemaphore;
+import org.apache.drill.exec.coord.store.TransientStore;
+import org.apache.drill.exec.coord.store.TransientStoreConfig;
 import org.apache.drill.exec.proto.CoordinationProtos.DrillbitEndpoint;
 
 import com.google.common.collect.Maps;
@@ -123,6 +125,11 @@ public class LocalClusterCoordinator extends ClusterCoordinator {
       semaphores.putIfAbsent(name, new LocalSemaphore(maximumLeases));
     }
     return semaphores.get(name);
+  }
+
+  @Override
+  public <V> TransientStore<V> newTransientStore(final TransientStoreConfig<V> config) {
+    return new MapBackedStore<>(config);
   }
 
   public class LocalSemaphore implements DistributedSemaphore {
