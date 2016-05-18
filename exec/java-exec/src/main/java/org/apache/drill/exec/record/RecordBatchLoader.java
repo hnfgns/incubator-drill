@@ -119,9 +119,9 @@ public class RecordBatchLoader implements VectorAccessible, Iterable<VectorWrapp
         }
         newVectors.add(vector);
       }
-      if (buf != null) {
-        Preconditions.checkArgument(bufOffset == buf.capacity(), "received buffer is not entirely consumed");
-      }
+//      if (buf != null) {
+//        Preconditions.checkArgument(bufOffset == buf.capacity(), "received buffer is not entirely consumed");
+//      }
 
 
       // rebuild the schema.

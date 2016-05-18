@@ -43,6 +43,8 @@ import org.apache.drill.exec.record.BatchSchema;
 import org.apache.drill.exec.record.BatchSchema.SelectionVectorMode;
 import org.apache.drill.exec.record.FragmentWritableBatch;
 import org.apache.drill.exec.record.RecordBatch;
+import org.apache.drill.exec.record.SimpleVectorWrapper;
+import org.apache.drill.exec.record.TransferPair;
 import org.apache.drill.exec.record.TypedFieldId;
 import org.apache.drill.exec.record.VectorAccessible;
 import org.apache.drill.exec.record.VectorContainer;
@@ -51,6 +53,7 @@ import org.apache.drill.exec.record.WritableBatch;
 import org.apache.drill.exec.record.selection.SelectionVector2;
 import org.apache.drill.exec.record.selection.SelectionVector4;
 import org.apache.drill.exec.rpc.RpcOutcomeListener;
+import org.apache.drill.exec.vector.CopyUtil;
 import org.apache.drill.exec.vector.ValueVector;
 
 import com.google.common.collect.Lists;
@@ -469,6 +472,14 @@ public abstract class PartitionerTemplate implements Partitioner {
       logger.warn("schema before expansion {}", vectorContainer.getSchema());
       for (final VectorWrapper wrapper:wrappers) {
         final ValueVector oldVector = wrapper.getValueVector();
+
+        if (CopyUtil.useCopyFromSafe(wrapper.getField().getType())) {
+          TransferPair tp = oldVector.getTransferPair(allocator);
+          tp.transfer();
+          newVectors.add(tp.getTo());
+          continue;
+        }
+
         final ValueVector newVector = TypeHelper.getNewVector(oldVector.getField(), allocator);
         newVectors.add(newVector);
 

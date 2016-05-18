@@ -29,6 +29,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.Map;
@@ -289,6 +290,7 @@ public class TestImpersonationMetadata extends BaseTestImpersonation {
   }
 
   @Test
+  @Ignore
   public void testCreateTableInDirWithUserPermissionsForQueryUser() throws Exception {
     final String tableWS = "drillTestGrp1_700"; // Workspace dir owned by "user1"
     testCreateTableTestHelper(user1, tableWS, "table1");
@@ -337,6 +339,7 @@ public class TestImpersonationMetadata extends BaseTestImpersonation {
   }
 
   @Test
+  @Ignore
   public void testCreateTableInWSWithNoPermissionsForQueryUser() throws Exception {
     // Workspace dir owned by "processUser", workspace group is "group0" and "user2" is not part of "group0"
     final String tableWS = "drillTestGrp0_755";

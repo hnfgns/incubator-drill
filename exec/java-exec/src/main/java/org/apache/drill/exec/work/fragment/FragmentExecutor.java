@@ -320,66 +320,69 @@ public class FragmentExecutor implements Runnable {
               int iteration = 0;
               int maxIterations = Integer.MAX_VALUE;
 
-              do {
-                isCompleted = false;
-                iteration++;
-                try {
-                  final IterationResult result = root.next();
-                  logger.info("this iteration resulted with {}", result);
-                  switch (result) {
-                    case SENDING_BUFFER_FULL:
-                      final Runnable sendingTask = this;
-                      root.setSendAvailabilityListener(new SendAvailabilityListener() {
-                        @Override
-                        public void onSendAvailable(final RootExec exec) {
-                          queue.offer(FIFOTask.of(sendingTask, fragmentHandle));
-                          logger.debug("sending provider is now available");
-                        }
-                      });
-                      logger.debug("sending provider is full. backing off...");
-                      return;
-                    case NOT_YET:
-                      final IncomingBatchProvider blockingProvider = Preconditions.checkNotNull(
+              try {
+                do {
+                  isCompleted = false;
+                  iteration++;
+                  try {
+                    final IterationResult result = root.next();
+                    logger.info("this iteration resulted with {}", result);
+                    switch (result) {
+                      case SENDING_BUFFER_FULL:
+                        final Runnable sendingTask = this;
+                        root.setSendAvailabilityListener(new SendAvailabilityListener() {
+                          @Override
+                          public void onSendAvailable(final RootExec exec) {
+                            queue.offer(FIFOTask.of(sendingTask, fragmentHandle));
+                            logger.debug("sending provider is now available");
+                          }
+                        });
+                        logger.debug("sending provider is full. backing off...");
+                        return;
+                      case NOT_YET:
+                        final IncomingBatchProvider blockingProvider = Preconditions.checkNotNull(
                           fragmentContext.getAndResetBlockingIncomingBatchProvider(),
                           "blocking provider is required.");
 
-                      final Runnable receivingTask = this;
-                      blockingProvider.setReadAvailabilityListener(new ReadAvailabilityListener() {
-                        @Override
-                        public void onReadAvailable(final IncomingBatchProvider provider) {
-                          queue.offer(FIFOTask.of(receivingTask, fragmentHandle));
-                          logger.debug("reading provider is now available");
-                        }
-                      });
-                      logger.debug("reading provider is empty. backing off...");
-                      return;
-                    case CONTINUE:
-                      isCompleted = !shouldContinue();
-                      final boolean lastIteration = iteration == maxIterations;
-                      final boolean shouldDefer = !isCompleted && (result == IterationResult.NOT_YET
+                        final Runnable receivingTask = this;
+                        blockingProvider.setReadAvailabilityListener(new ReadAvailabilityListener() {
+                          @Override
+                          public void onReadAvailable(final IncomingBatchProvider provider) {
+                            queue.offer(FIFOTask.of(receivingTask, fragmentHandle));
+                            logger.debug("reading provider is now available");
+                          }
+                        });
+                        logger.debug("reading provider is empty. backing off...");
+                        return;
+                      case CONTINUE:
+                        isCompleted = !shouldContinue();
+                        final boolean lastIteration = iteration == maxIterations;
+                        final boolean shouldDefer = !isCompleted && (result == IterationResult.NOT_YET
                           || result == IterationResult.SENDING_BUFFER_FULL
                           || lastIteration);
-                      if (shouldDefer) {
-                        queue.offer(this);
-                        return;
-                      }
-                      logger.warn("executor state -> iterations: {} isCompleted? {} shouldDefer? {}", count++,
+                        if (shouldDefer) {
+                          queue.offer(this);
+                          return;
+                        }
+                        logger.warn("executor state -> iterations: {} isCompleted? {} shouldDefer? {}", count++,
                           isCompleted, shouldDefer);
-                      break;
-                    case COMPLETED:
-                      isCompleted = true;
-                      return;
+                        break;
+                      case COMPLETED:
+                        isCompleted = true;
+                        return;
+                    }
+                  } catch (final Exception ex) {
+                    fail(ex);
+                    isCompleted = true;
+                  } finally {
+                    if (isCompleted) {
+                      onComplete();
+                    }
                   }
-                } catch (final Exception ex) {
-                  fail(ex);
-                  isCompleted = true;
-                } finally {
-                  if (isCompleted) {
-                    onComplete();
-                  }
-                }
-              } while (!isCompleted && iteration < maxIterations);
-              executor.setName(originalThreadName);
+                } while (!isCompleted && iteration < maxIterations);
+              } finally {
+                executor.setName(originalThreadName);
+              }
             }
           };
 

@@ -118,6 +118,7 @@ public class ExternalSortBatch extends AbstractRecordBatch<ExternalSort> {
   private final String fileName;
   private int firstSpillBatchCount = 0;
   private int peakNumBatches = -1;
+  private boolean phaseOneDone = false;
 
   /**
    * The copier uses the COPIER_BATCH_MEM_LIMIT to estimate the target
@@ -267,13 +268,11 @@ public class ExternalSortBatch extends AbstractRecordBatch<ExternalSort> {
 
   @Override
   public IterOutcome innerNext() {
-    if (schema != null) {
+    if (phaseOneDone) {
       if (spillCount == 0) {
         // selection vector is assigned down in this method.
         final SelectionVector4 vector = getSelectionVector4();
-        if (vector == null) {
-          return IterOutcome.NOT_YET;
-        }
+        assert vector != null : "sort didn't spill yet sv4 is null";
         return (vector.next()) ? IterOutcome.OK : IterOutcome.NONE;
       } else {
         Stopwatch w = Stopwatch.createStarted();
@@ -433,6 +432,8 @@ public class ExternalSortBatch extends AbstractRecordBatch<ExternalSort> {
           throw new UnsupportedOperationException();
         }
       }
+
+      phaseOneDone = true;
 
       if (totalCount == 0) {
         return IterOutcome.NONE;

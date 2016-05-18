@@ -17,6 +17,7 @@
  */
 package org.apache.drill.exec.vector;
 
+import org.apache.drill.common.types.TypeProtos;
 import org.apache.drill.common.types.Types;
 import org.apache.drill.exec.expr.ClassGenerator;
 import org.apache.drill.exec.record.TypedFieldId;
@@ -28,6 +29,10 @@ import com.sun.codemodel.JExpression;
 import com.sun.codemodel.JVar;
 
 public class CopyUtil {
+  public static boolean useCopyFromSafe(final TypeProtos.MajorType majorType) {
+    return !Types.isFixedWidthType(majorType) || Types.isRepeated(majorType) || Types.isComplex(majorType);
+  }
+
   public static void generateCopies(ClassGenerator<?> g, VectorAccessible batch, boolean hyper){
     // we have parallel ids for each value vector so we don't actually have to deal with managing the ids at all.
     int fieldId = 0;
@@ -36,7 +41,7 @@ public class CopyUtil {
     JExpression outIndex = JExpr.direct("outIndex");
     for(VectorWrapper<?> vv : batch) {
       String copyMethod;
-      if (!Types.isFixedWidthType(vv.getField().getType()) || Types.isRepeated(vv.getField().getType()) || Types.isComplex(vv.getField().getType())) {
+      if (useCopyFromSafe(vv.getField().getType())) {
         copyMethod = "copyFromSafe";
       } else {
         copyMethod = "copyFrom";

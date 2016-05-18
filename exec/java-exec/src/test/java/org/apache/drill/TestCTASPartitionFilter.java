@@ -18,18 +18,23 @@
 package org.apache.drill;
 
 
-import org.apache.drill.common.util.FileUtils;
 import org.apache.drill.common.util.TestTools;
-import org.junit.BeforeClass;
+import org.junit.After;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 
 public class TestCTASPartitionFilter extends PlanTestBase {
-  static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(TestCTASPartitionFilter.class);
+//  private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(TestCTASPartitionFilter.class);
 
   static final String WORKING_PATH = TestTools.getWorkingPath();
   static final String TEST_RES_PATH = WORKING_PATH + "/src/test/resources";
+
+  @After
+  public void resetOptions() throws Exception {
+    runSQL("reset planner.slice_target");
+    runSQL("reset `store.partition.hash_distribute`");
+  }
 
   private static void testExcludeFilter(String query, int expectedNumFiles,
       String excludedFilterPattern, int expectedRowCount) throws Exception {

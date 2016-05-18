@@ -193,6 +193,7 @@ public final class ${minor.class}Vector extends BaseDataValueVector implements V
     this.offsetVector.transferTo(target.offsetVector);
     target.data = data.transferOwnership(target.allocator).buffer;
     target.data.writerIndex(data.writerIndex());
+    target.allocationSizeInBytes = allocationSizeInBytes;
     clear();
   }
 

@@ -160,10 +160,10 @@ public class WritableBatch implements AutoCloseable {
         vv.clear();
         continue;
       }
-      if (recordCount > 0) {
-        final int size = vv.getBufferSize();
-        Preconditions.checkArgument(size > 0, "wtf buffer size {}", vv.getField());
-      }
+//      if (recordCount > 0) {
+//        final int size = vv.getBufferSize();
+//        Preconditions.checkArgument(size > 0, "wtf buffer size {}", vv.getField());
+//      }
 
       for (DrillBuf b : vv.getBuffers(true)) {
         buffers.add(b);
