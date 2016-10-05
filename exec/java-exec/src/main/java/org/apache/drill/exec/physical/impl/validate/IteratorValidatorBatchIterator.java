@@ -192,7 +192,7 @@ public class IteratorValidatorBatchIterator implements CloseableRecordBatch {
 
   @Override
   public IterOutcome next() {
-    logger.debug( "[#{}; on {}]: next() called.", instNum, batchTypeName);
+    logger.trace( "[#{}; on {}]: next() called.", instNum, batchTypeName);
     final IterOutcome prevBatchState = batchState;
     try {
 

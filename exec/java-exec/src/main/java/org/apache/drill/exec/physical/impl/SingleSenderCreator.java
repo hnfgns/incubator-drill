@@ -21,13 +21,12 @@ import java.util.List;
 
 import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.exec.exception.OutOfMemoryException;
-import org.apache.drill.exec.ops.AccountingDataTunnel;
-import org.apache.drill.exec.ops.DelegatingAccountingDataTunnel;
+import org.apache.drill.exec.ops.FragmentDelegatingAccountingDataTunnel;
+import org.apache.drill.exec.ops.FragmentAccountingDataTunnel;
 import org.apache.drill.exec.ops.FragmentContext;
 import org.apache.drill.exec.ops.MetricDef;
 import org.apache.drill.exec.physical.MinorFragmentEndpoint;
 import org.apache.drill.exec.physical.config.SingleSender;
-import org.apache.drill.exec.physical.impl.partitionsender.PartitionSenderIterationState;
 import org.apache.drill.exec.proto.ExecProtos.FragmentHandle;
 import org.apache.drill.exec.record.BatchSchema;
 import org.apache.drill.exec.record.FragmentWritableBatch;
@@ -52,7 +51,7 @@ public class SingleSenderCreator implements RootCreator<SingleSender>{
     private final FragmentHandle oppositeHandle;
 
     private RecordBatch incoming;
-    private AccountingDataTunnel tunnel;
+    private FragmentAccountingDataTunnel tunnel;
     private FragmentHandle handle;
     private volatile boolean ok = true;
     private volatile boolean done = false;
@@ -78,7 +77,7 @@ public class SingleSenderCreator implements RootCreator<SingleSender>{
       final MinorFragmentEndpoint endpoint = MinorFragmentEndpoint.of(config.getOppositeMinorFragmentId(),
           config.getDestination());
       tunnel = context.getDataTunnel(endpoint);
-      tunnel = DelegatingAccountingDataTunnel.of(context.getDataTunnel(endpoint), getSendAvailabilityNotifier());
+      tunnel = FragmentDelegatingAccountingDataTunnel.of(context.getDataTunnel(endpoint), getSendAvailabilityNotifier());
       tunnel.setTestInjectionControls(injector, context.getExecutionControls(), logger);
     }
 
@@ -105,14 +104,14 @@ public class SingleSenderCreator implements RootCreator<SingleSender>{
         final IterationState pendingState = restorePendingState();
         clearPendingState();
         out = pendingState.outcome;
-        logger.warn("restored pending state outcome {}", out);
+        logger.trace("restored pending state outcome {}", out);
       } else if (!done) {
         out = next(incoming);
         // if we got a state where we need to send a batch but buffer is not available. save the state and back off.
-        logger.warn("got new outcome {}", out);
+        logger.trace("got new outcome {}", out);
         if (RootExecHelper.isInSendingState(out) && !canSend()) {
           savePendingState(IterationState.of(out));
-          logger.warn("cannot send. saving state of {}", out);
+          logger.trace("cannot send. saving state of {}", out);
           return IterationResult.SENDING_BUFFER_FULL;
         }
       } else {

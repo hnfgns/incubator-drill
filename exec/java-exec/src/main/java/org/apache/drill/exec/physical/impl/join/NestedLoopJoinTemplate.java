@@ -55,6 +55,12 @@ public abstract class NestedLoopJoinTemplate implements NestedLoopJoin {
   // Next record in the left batch to process
   private int nextLeftRecordToProcess = 0;
 
+  /** number of records written to current outgoing batch */
+  private int outputIndex = 0; // this needs to be saved in case of a NOT_YET
+
+  /** did last call to {@link #outputRecords()} hit a NOT_YET ? */
+  private boolean notYetOnLeft = false;
+
   /**
    * Method initializes necessary state and invokes the doSetup() to set the
    * input and output value vector references
@@ -140,27 +146,44 @@ public abstract class NestedLoopJoinTemplate implements NestedLoopJoin {
    * Main entry point for producing the output records. Thin wrapper around populateOutgoingBatch(), this method
    * controls which left batch we are processing and fetches the next left input batch one we exhaust
    * the current one.
-   * @return the number of records produced in the output batch
+   *
+   * @return false if NOT_YET received on the left side
    */
-  public int outputRecords() {
-    int outputIndex = 0;
+  public boolean outputRecords() {
+    if (notYetOnLeft) {
+      assert outputIndex >= 0 : "outputIndex was not saved properly for NOT_YET";
+
+      boolean batchFetched = resetAndGetNextLeft();
+      assert batchFetched : "received NOT_YET when a batch was expected";
+
+      notYetOnLeft = false;
+    } else {
+      outputIndex = 0;
+    }
+
     while (leftRecordCount != 0) {
       outputIndex = populateOutgoingBatch(outputIndex);
       if (outputIndex >= NestedLoopJoinBatch.MAX_BATCH_SIZE) {
         break;
       }
       // reset state and get next left batch
-      resetAndGetNextLeft();
+      if (!resetAndGetNextLeft()) {
+        notYetOnLeft = true;
+        return false; // received NOT_YET
+      }
     }
-    return outputIndex;
+
+    return true;
   }
 
   /**
    * Utility method to clear the memory in the left input batch once we have completed processing it. Resets some
    * internal state which indicate the next records to process in the left and right batches. Also fetches the next
    * left input batch.
+   *
+   * @return false if it couldn't fetch a new batch on the left side and got NOT_YET instead
    */
-  private void resetAndGetNextLeft() {
+  private boolean resetAndGetNextLeft() {
 
     for (VectorWrapper<?> vw : left) {
       vw.getValueVector().clear();
@@ -172,14 +195,27 @@ public abstract class NestedLoopJoinTemplate implements NestedLoopJoin {
         throw new DrillRuntimeException("Nested loop join does not handle schema change. Schema change" +
             " found on the left side of NLJ.");
       case NONE:
-      case NOT_YET:
       case STOP:
         leftRecordCount = 0;
         break;
+      case NOT_YET:
+        return false;
       case OK:
         leftRecordCount = left.getRecordCount();
         break;
     }
+
+    return true;
+  }
+
+  @Override
+  public int getNumRecords() {
+    return outputIndex;
+  }
+
+  @Override
+  public boolean hasNotYet() {
+    return notYetOnLeft;
   }
 
   public abstract void doSetup(@Named("context") FragmentContext context,

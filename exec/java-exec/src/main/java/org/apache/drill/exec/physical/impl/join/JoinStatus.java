@@ -33,7 +33,11 @@ public final class JoinStatus {
 
   public final RecordIterator left;
   public final RecordIterator right;
-  private boolean iteratorInitialized;
+  private boolean rightInitialized;
+  private boolean leftInitialized;
+
+  private boolean leftPrepared;
+  private boolean rightPrepared;
 
   private int outputPosition;
   public MergeJoinBatch outputBatch;
@@ -49,7 +53,6 @@ public final class JoinStatus {
     this.right = right;
     this.outputBatch = output;
     this.joinType = output.getJoinType();
-    this.iteratorInitialized = false;
     this.allowMarking = true;
   }
 
@@ -63,7 +66,7 @@ public final class JoinStatus {
         + ", outputPosition = " + outputPosition
         + ", joinType = " + joinType
         + ", ok = " + ok
-        + ", initialSet = " + iteratorInitialized
+        + ", initialSet = (left = " + leftInitialized + ", right = " + rightInitialized + ")"
         + ", left = " + left
         + ", right = " + right
         + ", outputBatch = " + outputBatch
@@ -72,20 +75,41 @@ public final class JoinStatus {
 
   // Initialize left and right record iterator. We avoid doing this in constructor.
   // Callers must check state of each iterator after calling ensureInitial.
-  public void initialize() {
-    if (!iteratorInitialized) {
-      left.next();
-      right.next();
-      iteratorInitialized = true;
+  public boolean initialize() {
+    if (!leftInitialized) {
+      if (left.next() == IterOutcome.NOT_YET) {
+        return false;
+      }
+      leftInitialized = true;
     }
+    if (!rightInitialized) {
+      if (right.next() == IterOutcome.NOT_YET) {
+        return false;
+      }
+      rightInitialized = true;
+    }
+    return true;
   }
 
-  public void prepare() {
-    if (!iteratorInitialized) {
-      initialize();
+  public boolean prepare() {
+    if (!leftInitialized || !rightInitialized) {
+      if (!initialize()) {
+        return false;
+      }
     }
-    left.prepare();
-    right.prepare();
+    if (!leftPrepared) {
+      if (!left.prepare()) {
+        return false;
+      }
+      leftPrepared = true;
+    }
+    if (!rightPrepared) {
+      if (!right.prepare()) {
+        return false;
+      }
+      rightPrepared = true;
+    }
+    return true;
   }
 
   public IterOutcome getLeftStatus() { return left.getLastOutcome(); }

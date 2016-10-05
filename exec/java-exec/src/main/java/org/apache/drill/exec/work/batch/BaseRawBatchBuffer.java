@@ -150,7 +150,7 @@ public abstract class BaseRawBatchBuffer<T> implements RawBatchBuffer {
   private void allStreamsFinished() {
     if (state != BufferState.KILLED) {
       state = BufferState.STREAMS_FINISHED;
-      logger.warn("all streams finished");
+      logger.debug("all streams finished");
     }
 
     if (!bufferQueue.isEmpty()) {

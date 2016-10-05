@@ -17,7 +17,6 @@
  */
 package org.apache.drill.exec.ops;
 
-import org.apache.drill.exec.physical.MinorFragmentEndpoint;
 import org.apache.drill.exec.proto.GeneralRPCProtos;
 import org.apache.drill.exec.record.FragmentWritableBatch;
 import org.apache.drill.exec.rpc.RpcOutcomeListener;
@@ -29,11 +28,11 @@ import org.slf4j.Logger;
 public interface AccountingDataTunnel {
 
   boolean isSendingBufferAvailable();
-  MinorFragmentEndpoint getRemoteEndpoint();
 
   RpcOutcomeListener<GeneralRPCProtos.Ack> getStatusHandler();
 
   void sendRecordBatch(FragmentWritableBatch batch);
+
   void sendRecordBatch(RpcOutcomeListener<GeneralRPCProtos.Ack> listener, FragmentWritableBatch batch);
 
   /**

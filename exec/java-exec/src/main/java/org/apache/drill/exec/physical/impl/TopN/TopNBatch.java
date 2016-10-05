@@ -170,8 +170,8 @@ public class TopNBatch extends AbstractRecordBatch<TopN> {
     if (state == BatchState.DONE) {
       return IterOutcome.NONE;
     }
-    if (schema != null) {
-      if (getSelectionVector4().next()) {
+    if (schema != null && sv4 != null) {
+      if (sv4.next()) {
         recordCount = sv4.getCount();
         return IterOutcome.OK;
       } else {

@@ -243,7 +243,7 @@ public class HashJoinBatch extends AbstractRecordBatch<HashJoinPOP> {
         // Update the hash table related stats for the operator
         updateStats(this.hashTable);
         state = BatchState.NOT_FIRST;
-        logger.warn("build is completed");
+        logger.trace("build is completed");
       }
 
       // Store the number of records projected

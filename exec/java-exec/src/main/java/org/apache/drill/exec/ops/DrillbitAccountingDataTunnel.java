@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * <p/>
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * <p/>
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,37 +18,37 @@
 package org.apache.drill.exec.ops;
 
 import com.google.common.base.Preconditions;
-import org.apache.drill.exec.physical.MinorFragmentEndpoint;
 import org.apache.drill.exec.proto.GeneralRPCProtos;
 import org.apache.drill.exec.record.FragmentWritableBatch;
-import org.apache.drill.exec.rpc.CompositeRpcOutcomeListener;
 import org.apache.drill.exec.rpc.RpcOutcomeListener;
+import org.apache.drill.exec.rpc.data.DataTunnel;
 import org.apache.drill.exec.testing.ControlsInjector;
 import org.apache.drill.exec.testing.ExecutionControls;
-import org.slf4j.Logger;
 
-public class DelegatingAccountingDataTunnel implements AccountingDataTunnel {
-  private final AccountingDataTunnel delegate;
-  private final RpcOutcomeListener<GeneralRPCProtos.Ack> listener;
+public class DrillbitAccountingDataTunnel implements AccountingDataTunnel {
+  private final DataTunnel tunnel;
+  private final SendingAccountor sendingAccountor;
+  private final RpcOutcomeListener<GeneralRPCProtos.Ack> statusHandler;
 
-  public DelegatingAccountingDataTunnel(final AccountingDataTunnel delegate, final RpcOutcomeListener<GeneralRPCProtos.Ack> listener) {
-    this.delegate = Preconditions.checkNotNull(delegate, "delegate is required");
-    this.listener = CompositeRpcOutcomeListener.of(delegate.getStatusHandler(), listener);
-  }
-
-  @Override
-  public MinorFragmentEndpoint getRemoteEndpoint() {
-    return delegate.getRemoteEndpoint();
+  public DrillbitAccountingDataTunnel(final DataTunnel tunnel, final SendingAccountor accountor,
+                                      final RpcOutcomeListener<GeneralRPCProtos.Ack> statusHandler) {
+    this.tunnel = Preconditions.checkNotNull(tunnel, "tunnel is required");
+    this.sendingAccountor = Preconditions.checkNotNull(accountor, "accountor is required");
+    this.statusHandler = Preconditions.checkNotNull(statusHandler, "statusHandler is required");
   }
 
   @Override
   public RpcOutcomeListener<GeneralRPCProtos.Ack> getStatusHandler() {
-    return listener;
+    return statusHandler;
   }
 
   @Override
   public boolean isSendingBufferAvailable() {
-    return delegate.isSendingBufferAvailable();
+    return getSendingBufferAvailability() > 0;
+  }
+
+  public int getSendingBufferAvailability() {
+    return tunnel.getSendingBufferAvailability();
   }
 
   @Override
@@ -58,16 +58,13 @@ public class DelegatingAccountingDataTunnel implements AccountingDataTunnel {
 
   @Override
   public void sendRecordBatch(final RpcOutcomeListener<GeneralRPCProtos.Ack> listener, final FragmentWritableBatch batch) {
-    delegate.sendRecordBatch(listener, batch);
+    sendingAccountor.increment();
+    tunnel.sendRecordBatch(listener, batch);
   }
 
   @Override
-  public void setTestInjectionControls(ControlsInjector testInjector, ExecutionControls testControls, Logger testLogger) {
-    delegate.setTestInjectionControls(testInjector, testControls, testLogger);
-  }
-
-  public static DelegatingAccountingDataTunnel of(final AccountingDataTunnel delegate,
-                                                  final RpcOutcomeListener<GeneralRPCProtos.Ack> listener) {
-    return new DelegatingAccountingDataTunnel(delegate, listener);
+  public void setTestInjectionControls(final ControlsInjector testInjector,
+                                       final ExecutionControls testControls, final org.slf4j.Logger testLogger) {
+    tunnel.setTestInjectionControls(testInjector, testControls, testLogger);
   }
 }

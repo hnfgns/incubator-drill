@@ -21,7 +21,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.Executor;
 
 import org.apache.drill.common.SelfCleaningRunnable;
 import org.apache.drill.common.concurrent.ExtendedLatch;
@@ -76,7 +75,6 @@ public class WorkManager implements AutoCloseable {
   private final UserWorker userWorker;
   private final WorkerBee bee;
   private final WorkEventBus workBus;
-  private final Executor executor;
   private final StatusThread statusThread;
 
   /**
@@ -88,7 +86,6 @@ public class WorkManager implements AutoCloseable {
     this.bContext = context;
     bee = new WorkerBee(); // TODO should this just be an interface?
     workBus = new WorkEventBus(); // TODO should this just be an interface?
-    executor = context.getExecutor();
 
     // TODO references to this escape here (via WorkerBee) before construction is done
     controlMessageWorker = new ControlMessageHandler(bee); // TODO getFragmentRunner(), getForemanForQueryId()
@@ -118,10 +115,6 @@ public class WorkManager implements AutoCloseable {
     } catch (final IllegalArgumentException e) {
       logger.warn("Exception while registering metrics", e);
     }
-  }
-
-  public Executor getExecutor() {
-    return executor;
   }
 
   public WorkEventBus getWorkBus() {
@@ -203,7 +196,7 @@ public class WorkManager implements AutoCloseable {
       queries.put(foreman.getQueryId(), foreman);
 
       // We're relying on the Foreman to clean itself up with retireForeman().
-      executor.execute(foreman);
+      bContext.getExecutor().execute(foreman);
     }
 
     /**
@@ -245,7 +238,7 @@ public class WorkManager implements AutoCloseable {
     public void addFragmentRunner(final FragmentExecutor fragmentExecutor) {
       final FragmentHandle fragmentHandle = fragmentExecutor.getContext().getHandle();
       runningFragments.put(fragmentHandle, fragmentExecutor);
-      executor.execute(new SelfCleaningRunnable(fragmentExecutor) {
+      bContext.getTaskExecutor().execute(new SelfCleaningRunnable(fragmentExecutor) {
         @Override
         protected void cleanup() {
           if (fragmentExecutor.isCompleted()) {
@@ -269,7 +262,7 @@ public class WorkManager implements AutoCloseable {
         return;
       }
       runningFragments.put(fragmentHandle, fragmentExecutor);
-      executor.execute(new SelfCleaningRunnable(fragmentExecutor) {
+      bContext.getTaskExecutor().execute(new SelfCleaningRunnable(fragmentExecutor) {
         @Override
         protected void cleanup() {
           if (fragmentExecutor.isCompleted()) {

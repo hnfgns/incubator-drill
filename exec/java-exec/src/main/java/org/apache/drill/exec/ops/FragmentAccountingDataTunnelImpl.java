@@ -35,17 +35,15 @@ import org.slf4j.Logger;
  * Wrapper around a {@link org.apache.drill.exec.rpc.data.DataTunnel} that tracks the status of batches sent to
  * to other Drillbits.
  */
-public class DefaultAccountingDataTunnel implements AccountingDataTunnel {
-  private final DataTunnel tunnel;
-  private final SendingAccountor sendingAccountor;
-  private final RpcOutcomeListener<Ack> statusHandler;
+public class FragmentAccountingDataTunnelImpl extends DrillbitAccountingDataTunnel implements FragmentAccountingDataTunnel {
   private final MinorFragmentEndpoint endpoint;
 
-  public DefaultAccountingDataTunnel(final DataTunnel tunnel, final MinorFragmentEndpoint endpoint, final SendingAccountor accountor, final RpcOutcomeListener<Ack> statusHandler) {
-    this.tunnel = Preconditions.checkNotNull(tunnel, "tunnel is required");
+  public FragmentAccountingDataTunnelImpl(final DataTunnel tunnel,
+                                          final MinorFragmentEndpoint endpoint,
+                                          final SendingAccountor accountor,
+                                          final RpcOutcomeListener<Ack> statusHandler) {
+    super(tunnel, accountor, statusHandler);
     this.endpoint = Preconditions.checkNotNull(endpoint, "endpoint is required");
-    this.sendingAccountor = Preconditions.checkNotNull(accountor, "accountor is required");
-    this.statusHandler = Preconditions.checkNotNull(statusHandler, "statusHandler is required");
   }
 
   @Override
@@ -53,34 +51,4 @@ public class DefaultAccountingDataTunnel implements AccountingDataTunnel {
     return endpoint;
   }
 
-  @Override
-  public RpcOutcomeListener<Ack> getStatusHandler() {
-    return statusHandler;
-  }
-
-  @Override
-  public boolean isSendingBufferAvailable() {
-    return getSendingBufferAvailability() > 0;
-  }
-
-  public int getSendingBufferAvailability() {
-    return tunnel.getSendingBufferAvailability();
-  }
-
-  @Override
-  public void sendRecordBatch(final FragmentWritableBatch batch) {
-    sendRecordBatch(getStatusHandler(), batch);
-  }
-
-  @Override
-  public void sendRecordBatch(final RpcOutcomeListener<Ack> listener, final FragmentWritableBatch batch) {
-    sendingAccountor.increment();
-    tunnel.sendRecordBatch(listener, batch);
-  }
-
-  @Override
-  public void setTestInjectionControls(final ControlsInjector testInjector,
-                                       final ExecutionControls testControls, final org.slf4j.Logger testLogger) {
-    tunnel.setTestInjectionControls(testInjector, testControls, testLogger);
-  }
 }

@@ -101,6 +101,7 @@ public class MergingRecordBatch extends AbstractRecordBatch<MergingReceiverPOP> 
   private boolean hasRun = false;
   private boolean prevBatchWasFull = false;
   private boolean hasMoreIncoming = true;
+  private boolean prevWasDepleted = false;
 
   private int outgoingPosition = 0;
   private int senderCount = 0;
@@ -144,7 +145,7 @@ public class MergingRecordBatch extends AbstractRecordBatch<MergingReceiverPOP> 
       final RawFragmentBatch b = provider.getNext();
       if (b != null) {
         stats.addLongStat(Metric.BYTES_RECEIVED, b.getByteCount());
-        stats.batchReceived(0, b.getHeader().getDef().getRecordCount(), false);
+        stats.batchReceived(0, b.getHeader().getDef().getRecordCount(), false); // we shouldn't call this if b.isNone()
         inputCounts[providerIndex] += b.getHeader().getDef().getRecordCount();
       }
       return b;
@@ -369,10 +370,13 @@ public class MergingRecordBatch extends AbstractRecordBatch<MergingReceiverPOP> 
     while (!pqueue.isEmpty()) {
       // pop next value from pq and copy to outgoing batch
       final Node node = pqueue.peek();
-      if (!copyRecordToOutgoingBatch(node)) {
-        logger.debug("Outgoing vectors space is full; breaking");
-        prevBatchWasFull = true;
+      if (!prevWasDepleted) {
+        if (!copyRecordToOutgoingBatch(node)) {
+          logger.debug("Outgoing vectors space is full; breaking");
+          prevBatchWasFull = true;
+        }
       }
+      prevWasDepleted = false;
       pqueue.poll();
 
       final boolean depleted = node.valueIndex == batchLoaders[node.batchId].getRecordCount() - 1;
@@ -384,6 +388,7 @@ public class MergingRecordBatch extends AbstractRecordBatch<MergingReceiverPOP> 
           while ((nextBatch = getNext(node.batchId)) != null && nextBatch.getHeader().getDef().getRecordCount() == 0) {
             if (nextBatch.isNone()) {
               pqueue.add(node); // re-enqueue for retry later
+              prevWasDepleted = true; // save this state so we don't call copyRecordToOutgoingBatch() twice
               return IterOutcome.NOT_YET;
             }
           }

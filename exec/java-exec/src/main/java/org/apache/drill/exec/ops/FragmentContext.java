@@ -62,7 +62,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import org.apache.drill.exec.work.batch.RawBatchBuffer;
 
 /**
  * Contextual objects required for execution of a particular fragment.
@@ -70,7 +69,9 @@ import org.apache.drill.exec.work.batch.RawBatchBuffer;
 public class FragmentContext implements AutoCloseable, UdfUtilities {
   private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(FragmentContext.class);
 
-  private final Map<MinorFragmentEndpoint, AccountingDataTunnel> tunnels = Maps.newHashMap();
+  private final Map<MinorFragmentEndpoint, FragmentAccountingDataTunnel> fragmentTunnels = Maps.newHashMap();
+  private final Map<DrillbitEndpoint, DrillbitAccountingDataTunnel> drillbitTunnels = Maps.newHashMap();
+
   private final List<OperatorContextImpl> contexts = Lists.newLinkedList();
 
   private final DrillbitContext context;
@@ -332,12 +333,22 @@ public class FragmentContext implements AutoCloseable, UdfUtilities {
     return context.getController().getTunnel(endpoint);
   }
 
-  public AccountingDataTunnel getDataTunnel(final MinorFragmentEndpoint minorEndpoint) {
-    AccountingDataTunnel tunnel = tunnels.get(minorEndpoint);
+  public FragmentAccountingDataTunnel getDataTunnel(final MinorFragmentEndpoint minorEndpoint) {
+    FragmentAccountingDataTunnel tunnel = fragmentTunnels.get(minorEndpoint);
     if (tunnel == null) {
-      tunnel = new DefaultAccountingDataTunnel(context.getDataConnectionsPool().getTunnel(minorEndpoint.getEndpoint()),
+      tunnel = new FragmentAccountingDataTunnelImpl(context.getDataConnectionsPool().getTunnel(minorEndpoint.getEndpoint()),
           minorEndpoint, sendingAccountor, statusHandler);
-      tunnels.put(minorEndpoint, tunnel);
+      fragmentTunnels.put(minorEndpoint, tunnel);
+    }
+    return tunnel;
+  }
+
+  public DrillbitAccountingDataTunnel getDataTunnel(final DrillbitEndpoint drillbitEndpoint) {
+    DrillbitAccountingDataTunnel tunnel = drillbitTunnels.get(drillbitEndpoint);
+    if (tunnel == null) {
+      tunnel = new DrillbitAccountingDataTunnel(context.getDataConnectionsPool().getTunnel(drillbitEndpoint),
+          sendingAccountor, statusHandler);
+      drillbitTunnels.put(drillbitEndpoint, tunnel);
     }
     return tunnel;
   }
@@ -404,9 +415,6 @@ public class FragmentContext implements AutoCloseable, UdfUtilities {
 
   @Override
   public void close() {
-    //TODO: we do not want to block here. this is unnecessary with async back pressure.
-    waitForSendComplete();
-
     // close operator context
     for (OperatorContextImpl opContext : contexts) {
       suppressingClose(opContext);
@@ -451,11 +459,12 @@ public class FragmentContext implements AutoCloseable, UdfUtilities {
     return context.getExecutor();
   }
 
-  /**
-   * Wait for ack that all outgoing batches have been sent
-   */
-  public void waitForSendComplete() {
-    sendingAccountor.waitForSendComplete();
+  public void runWhenSendComplete(SendCompleteListener listener) {
+    sendingAccountor.setSendCompleteListener(listener);
+  }
+
+  public boolean isSendComplete() {
+    return sendingAccountor.isSendComplete();
   }
 
   public interface ExecutorState {
@@ -493,5 +502,10 @@ public class FragmentContext implements AutoCloseable, UdfUtilities {
     blockingProvider = null;
     return buffer;
   }
+
+  public interface SendCompleteListener {
+    void sendComplete();
+  }
+
 
 }

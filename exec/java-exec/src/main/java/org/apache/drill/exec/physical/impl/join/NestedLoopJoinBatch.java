@@ -89,6 +89,9 @@ public class NestedLoopJoinBatch extends AbstractRecordBatch<NestedLoopJoinPOP> 
   // Record count of the individual batches in the right hypoer container
   private LinkedList<Integer> rightCounts = new LinkedList<>();
 
+  /** true if we already pulled a batch from left side in {@link #buildSchema()} */
+  private boolean pulledFromLeft;
+  private boolean checkedSchemaOnLeft; //TODO I should probably use an enum to keep track of the state
 
   // Generator mapping for the right side
   private static final GeneratorMapping EMIT_RIGHT =
@@ -141,7 +144,19 @@ public class NestedLoopJoinBatch extends AbstractRecordBatch<NestedLoopJoinPOP> 
     // Accumulate batches on the right in a hyper container
     if (state == BatchState.FIRST) {
 
-      // exit if we have an empty left batch
+      // if we have a schema batch, skip it
+      if (!checkedSchemaOnLeft) {
+        if (leftUpstream != IterOutcome.NONE && left.getRecordCount() == 0) {
+          leftUpstream = next(LEFT_INPUT, left);
+          if (leftUpstream == IterOutcome.NOT_YET) {
+            return IterOutcome.NOT_YET;
+          }
+        }
+
+        checkedSchemaOnLeft = true;
+      }
+
+      // if left side is done and empty finish right away
       if (leftUpstream == IterOutcome.NONE) {
         // inform upstream that we don't need anymore data and make sure we clean up any batches already in queue
         killAndDrainRight();
@@ -176,11 +191,17 @@ public class NestedLoopJoinBatch extends AbstractRecordBatch<NestedLoopJoinPOP> 
       state = BatchState.NOT_FIRST;
     }
 
-    // allocate space for the outgoing batch
-    allocateVectors();
+    if (!nljWorker.hasNotYet()) {
+      // allocate space for the outgoing batch
+      allocateVectors();
+    }
 
     // invoke the runtime generated method to emit records in the output batch
-    outputRecords = nljWorker.outputRecords();
+    if (!nljWorker.outputRecords()) {
+      return IterOutcome.NOT_YET;
+    }
+
+    outputRecords = nljWorker.getNumRecords();
 
     // Set the record count
     for (final VectorWrapper<?> vw : container) {
@@ -294,10 +315,15 @@ public class NestedLoopJoinBatch extends AbstractRecordBatch<NestedLoopJoinPOP> 
   protected boolean buildSchema() throws SchemaChangeException {
 
     try {
-      leftUpstream = next(LEFT_INPUT, left);
-      if (leftUpstream == IterOutcome.NOT_YET) {
-        return false;
+      if (!pulledFromLeft) {
+        // make sure we don't call next twice on the left side if the right side returned NOT_YET
+        leftUpstream = next(LEFT_INPUT, left);
+        if (leftUpstream == IterOutcome.NOT_YET) {
+          return false;
+        }
+        pulledFromLeft = true;
       }
+
       rightUpstream = next(RIGHT_INPUT, right);
       if (rightUpstream == IterOutcome.NOT_YET) {
         return false;
@@ -317,11 +343,6 @@ public class NestedLoopJoinBatch extends AbstractRecordBatch<NestedLoopJoinPOP> 
         leftSchema = left.getSchema();
         for (final VectorWrapper<?> vw : left) {
           container.addOrGet(vw.getField());
-        }
-
-        // if we have a schema batch, skip it
-        if (left.getRecordCount() == 0) {
-          leftUpstream = next(LEFT_INPUT, left);
         }
       }
 

@@ -17,17 +17,13 @@
  ******************************************************************************/
 package org.apache.drill.exec.physical.impl.broadcastsender;
 
+import java.util.ArrayList;
 import java.util.List;
 
-import javax.annotation.Nullable;
-
-import com.google.common.base.Function;
-import com.google.common.base.Predicate;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
+import com.google.common.collect.ArrayListMultimap;
 import org.apache.drill.exec.exception.OutOfMemoryException;
 import org.apache.drill.exec.ops.AccountingDataTunnel;
-import org.apache.drill.exec.ops.DelegatingAccountingDataTunnel;
+import org.apache.drill.exec.ops.DrillbitDelegatingAccountingDataTunnel;
 import org.apache.drill.exec.ops.FragmentContext;
 import org.apache.drill.exec.ops.MetricDef;
 import org.apache.drill.exec.physical.MinorFragmentEndpoint;
@@ -40,8 +36,6 @@ import org.apache.drill.exec.record.FragmentWritableBatch;
 import org.apache.drill.exec.record.RecordBatch;
 import org.apache.drill.exec.record.WritableBatch;
 
-import com.google.common.collect.ArrayListMultimap;
-
 /**
  * Broadcast Sender broadcasts incoming batches to all receivers (one or more).
  * This is useful in cases such as broadcast join where sending the entire table to join
@@ -50,7 +44,7 @@ import com.google.common.collect.ArrayListMultimap;
 public class BroadcastSenderRootExec extends BaseRootExec<BroadcastSenderIterationState> {
   private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(BroadcastSenderRootExec.class);
   private final BroadcastSender config;
-//  private final int[][] receivingMinorFragments;
+  private final int[][] receivingMinorFragments;
   private final List<AccountingDataTunnel> tunnels;
   private final ExecProtos.FragmentHandle handle;
   private final RecordBatch incoming;
@@ -69,14 +63,31 @@ public class BroadcastSenderRootExec extends BaseRootExec<BroadcastSenderIterati
     this.incoming = incoming;
     this.config = config;
     this.handle = context.getHandle();
-    this.tunnels = Lists.transform(config.getDestinations(),
-      new Function<MinorFragmentEndpoint, AccountingDataTunnel>() {
-        @Nullable
-        @Override
-        public AccountingDataTunnel apply(final MinorFragmentEndpoint endpoint) {
-          return DelegatingAccountingDataTunnel.of(context.getDataTunnel(endpoint), getSendAvailabilityNotifier());
-        }
-      });
+    final List<MinorFragmentEndpoint> destinations = config.getDestinations();
+    final ArrayListMultimap<DrillbitEndpoint, Integer> dests = ArrayListMultimap.create();
+
+    for(MinorFragmentEndpoint destination : destinations) {
+      dests.put(destination.getEndpoint(), destination.getId());
+    }
+
+    final int destCount = dests.keySet().size();
+    int i = 0;
+
+    this.tunnels = new ArrayList<>();
+    this.receivingMinorFragments = new int[destCount][];
+    for(final DrillbitEndpoint ep : dests.keySet()){
+      List<Integer> minorsList = dests.get(ep);
+      final int[] minorsArray = new int[minorsList.size()];
+      int x = 0;
+      for(Integer m : minorsList){
+        minorsArray[x++] = m;
+      }
+      receivingMinorFragments[i] = minorsArray;
+      tunnels.add(DrillbitDelegatingAccountingDataTunnel.of(context.getDataTunnel(ep),
+          getSendAvailabilityNotifier()));
+      i++;
+    }
+    assert tunnels.size() == i;
   }
 
   @Override
@@ -120,7 +131,7 @@ public class BroadcastSenderRootExec extends BaseRootExec<BroadcastSenderIterati
               handle.getMajorFragmentId(),
               handle.getMinorFragmentId(),
               config.getOppositeMajorFragmentId(),
-              tunnels.get(i).getRemoteEndpoint().getId());
+              receivingMinorFragments[i]);
           stats.startWait();
           try {
             tunnels.get(i).sendRecordBatch(b2);
@@ -152,7 +163,7 @@ public class BroadcastSenderRootExec extends BaseRootExec<BroadcastSenderIterati
               handle.getMajorFragmentId(),
               handle.getMinorFragmentId(),
               config.getOppositeMajorFragmentId(),
-              tunnels.get(i).getRemoteEndpoint().getId(),
+              receivingMinorFragments[i],
               writableBatch);
           stats.startWait();
           try {

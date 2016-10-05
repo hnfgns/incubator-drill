@@ -17,12 +17,12 @@
  */
 package org.apache.drill.exec.server;
 
-import com.google.common.collect.Queues;
 import io.netty.channel.EventLoopGroup;
 
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.PriorityBlockingQueue;
+import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
@@ -50,6 +50,7 @@ public class BootStrapContext implements AutoCloseable {
   private final BufferAllocator allocator;
   private final ScanResult classpathScan;
   private final ExecutorService executor;
+  private final ExecutorService taskExecutor;
   private final BlockingQueue<Runnable> tasks;
 
   static class Task implements Runnable, Comparable {
@@ -78,11 +79,12 @@ public class BootStrapContext implements AutoCloseable {
     this.metrics = DrillMetrics.getInstance();
     this.allocator = RootAllocatorFactory.newRoot(config);
     this.tasks = new PriorityBlockingQueue<>();
+
     final int numCores = Runtime.getRuntime().availableProcessors();
     final int numThreads = (int)Math.ceil(cpuFactor * numCores);
     System.err.println("cpuFactor: " + cpuFactor + " -- numThreads: " +  numThreads);
-    this.executor = new ThreadPoolExecutor(numThreads, numThreads, 60L, TimeUnit.SECONDS, tasks,
-        new NamedThreadFactory("drill-executor-")) {
+    this.taskExecutor = new ThreadPoolExecutor(numThreads, numThreads, 60L, TimeUnit.SECONDS, tasks,
+        new NamedThreadFactory("fragment-executor-")) {
       @Override
       protected void afterExecute(final Runnable r, final Throwable t) {
         if (t != null) {
@@ -99,7 +101,18 @@ public class BootStrapContext implements AutoCloseable {
         super.execute(new Task(command));
       }
     };
-  }
+
+    this.executor = new ThreadPoolExecutor(0, Integer.MAX_VALUE, 60L, TimeUnit.SECONDS,
+      new SynchronousQueue<Runnable>(),
+      new NamedThreadFactory("drill-executor-")) {
+      @Override
+      protected void afterExecute(final Runnable r, final Throwable t) {
+        if (t != null) {
+          logger.error("{}.run() leaked an exception.", r.getClass().getName(), t);
+        }
+        super.afterExecute(r, t);
+      }
+    };  }
 
   public BlockingQueue<Runnable> getTaskQueue() {
     return tasks;
@@ -107,6 +120,10 @@ public class BootStrapContext implements AutoCloseable {
 
   public ExecutorService getExecutor() {
     return executor;
+  }
+
+  public ExecutorService getTaskExecutor() {
+    return taskExecutor;
   }
 
   public DrillConfig getConfig() {
@@ -133,14 +150,7 @@ public class BootStrapContext implements AutoCloseable {
     return classpathScan;
   }
 
-  @Override
-  public void close() {
-    try {
-      DrillMetrics.resetMetrics();
-    } catch (Error | Exception e) {
-      logger.warn("failure resetting metrics.", e);
-    }
-
+  private void shutDown(ExecutorService executor) {
     if (executor != null) {
       executor.shutdown(); // Disable new tasks from being submitted
       try {
@@ -161,6 +171,18 @@ public class BootStrapContext implements AutoCloseable {
         Thread.currentThread().interrupt();
       }
     }
+  }
+
+  @Override
+  public void close() {
+    try {
+      DrillMetrics.resetMetrics();
+    } catch (Error | Exception e) {
+      logger.warn("failure resetting metrics.", e);
+    }
+
+    shutDown(executor);
+    shutDown(taskExecutor);
 
     DrillAutoCloseables.closeNoChecked(allocator);
   }

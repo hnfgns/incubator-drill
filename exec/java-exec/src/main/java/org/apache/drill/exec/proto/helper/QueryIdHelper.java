@@ -42,8 +42,8 @@ public class QueryIdHelper {
   }
 
   public static String getExecutorThreadName(final FragmentHandle fragmentHandle) {
-    return String.format("frag:%s:%s",
-//        getQueryId(fragmentHandle.getQueryId()),
+    return String.format("%s:frag:%s:%s",
+        getQueryId(fragmentHandle.getQueryId()),
         fragmentHandle.getMajorFragmentId(), fragmentHandle.getMinorFragmentId());
   }
 

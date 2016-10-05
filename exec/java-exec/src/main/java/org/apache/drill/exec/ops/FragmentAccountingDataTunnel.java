@@ -15,26 +15,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.drill.exec.physical.impl.partitionsender;
+package org.apache.drill.exec.ops;
 
+import org.apache.drill.exec.physical.MinorFragmentEndpoint;
 
-import org.apache.drill.exec.ops.FragmentAccountingDataTunnel;
+public interface FragmentAccountingDataTunnel extends AccountingDataTunnel {
 
-public interface PartitionOutgoingBatch {
+  MinorFragmentEndpoint getRemoteEndpoint();
 
-  enum PartitionState {
-    INITIAL,
-    CANCELLED,
-    COMPLETED
-  }
-
-  PartitionState getState();
-
-  public long getTotalRecords();
-
-  public void terminate();
-
-  FragmentAccountingDataTunnel getTunnel();
-
-  void clear();
 }

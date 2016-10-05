@@ -37,7 +37,17 @@ public interface NestedLoopJoin {
                                   LinkedList<Integer> rightCounts,
                                   NestedLoopJoinBatch outgoing);
   // Produce output records
-  public int outputRecords();
+  public boolean outputRecords();
+
+  /**
+   * @return number of records in the output record batch
+   */
+  int getNumRecords();
+
+  /**
+   * @return true if last call to outputRecords hit a NOT_YET on the left side
+   */
+  boolean hasNotYet();
 
   // Project the record at offset 'leftIndex' in the left input batch into the output container at offset 'outIndex'
   public void emitLeft(int leftIndex, int outIndex);

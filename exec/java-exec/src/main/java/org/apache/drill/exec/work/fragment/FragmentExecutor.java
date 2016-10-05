@@ -78,13 +78,13 @@ public class FragmentExecutor implements Runnable {
   private final AtomicReference<FragmentState> fragmentState = new AtomicReference<>(FragmentState.AWAITING_ALLOCATION);
   private final ExtendedLatch acceptExternalEvents = new ExtendedLatch();
 
-  // Thread that is currently executing the Fragment. Value is null if the fragment hasn't started running or finished
-  private final AtomicReference<Thread> myThreadRef = new AtomicReference<>(null);
-
-  private final DrillbitStatusListener drillbitStatusListener = new FragmentDrillbitStatusListener();
+  private DrillbitStatusListener drillbitStatusListener;
   private final FragmentHandle fragmentHandle;
   private final DrillbitContext drillbitContext;
   private final ClusterCoordinator clusterCoordinator;
+
+  private final AtomicBoolean cleaned = new AtomicBoolean();
+  private volatile boolean pendingCompletion; // true if last call to tryComplete was going to block
 
   /**
    * Create a FragmentExecutor where we need to parse and materialize the root operator.
@@ -167,19 +167,6 @@ public class FragmentExecutor implements Runnable {
        * We set the cancel requested flag but the actual cancellation is managed by the run() loop, if called.
        */
       updateState(FragmentState.CANCELLATION_REQUESTED);
-
-      /*
-       * Interrupt the thread so that it exits from any blocking operation it could be executing currently. We
-       * synchronize here to ensure we don't accidentally create a race condition where we interrupt the close out
-       * procedure of the main thread.
-       */
-      synchronized (myThreadRef) {
-        final Thread myThread = myThreadRef.get();
-        if (myThread != null) {
-          logger.debug("Interrupting fragment thread {}", myThread.getName());
-          myThread.interrupt();
-        }
-      }
     } else {
       // countdown so receiver fragment finished can proceed.
       acceptExternalEvents.countDown();
@@ -198,6 +185,9 @@ public class FragmentExecutor implements Runnable {
     // only be sent once.
     sendFinalState();
 
+    if (drillbitStatusListener != null) {
+      clusterCoordinator.removeDrillbitStatusListener(drillbitStatusListener);
+    }
   }
 
   /**
@@ -264,16 +254,8 @@ public class FragmentExecutor implements Runnable {
       return;
     }
 
-//    final Thread myThread = Thread.currentThread();
-    // no interrupt
-//    myThreadRef.set(myThread);
-//    this.originalThreadName = myThread.getName();
-//    final String newThreadName = QueryIdHelper.getExecutorThreadName(fragmentHandle);
     boolean success = false;
     try {
-
-//      myThread.setName(newThreadName);
-
       // if we didn't get the root operator when the executor was created, create it now.
       final FragmentRoot rootOperator = this.rootOperator != null ? this.rootOperator :
           drillbitContext.getPlanReader().readFragmentOperator(fragment.getFragmentJson());
@@ -284,6 +266,7 @@ public class FragmentExecutor implements Runnable {
         return;
       }
 
+      drillbitStatusListener = new FragmentDrillbitStatusListener();
       clusterCoordinator.addDrillbitStatusListener(drillbitStatusListener);
       updateState(FragmentState.RUNNING);
 
@@ -320,13 +303,22 @@ public class FragmentExecutor implements Runnable {
               int iteration = 0;
               int maxIterations = Integer.MAX_VALUE;
 
+              if (pendingCompletion) {
+                pendingCompletion = false;
+                logger.trace("resuming pending completion");
+                boolean completed = tryComplete(); // finish cleaning up
+                Preconditions.checkState(completed,
+                  "tryComplete() shouldn't return false when resuming a pending completion");
+                return;
+              }
+
               try {
                 do {
                   isCompleted = false;
                   iteration++;
                   try {
                     final IterationResult result = root.next();
-                    logger.info("this iteration resulted with {}", result);
+                    logger.trace("this iteration resulted with {}", result);
                     switch (result) {
                       case SENDING_BUFFER_FULL:
                         final Runnable sendingTask = this;
@@ -334,10 +326,10 @@ public class FragmentExecutor implements Runnable {
                           @Override
                           public void onSendAvailable(final RootExec exec) {
                             queue.offer(FIFOTask.of(sendingTask, fragmentHandle));
-                            logger.debug("sending provider is now available");
+                            logger.trace("sending provider is now available");
                           }
                         });
-                        logger.debug("sending provider is full. backing off...");
+                        logger.trace("sending provider is full. backing off...");
                         return;
                       case NOT_YET:
                         final IncomingBatchProvider blockingProvider = Preconditions.checkNotNull(
@@ -349,23 +341,21 @@ public class FragmentExecutor implements Runnable {
                           @Override
                           public void onReadAvailable(final IncomingBatchProvider provider) {
                             queue.offer(FIFOTask.of(receivingTask, fragmentHandle));
-                            logger.debug("reading provider is now available");
+                            logger.trace("reading provider is now available");
                           }
                         });
-                        logger.debug("reading provider is empty. backing off...");
+                        logger.trace("reading provider is empty. backing off...");
                         return;
                       case CONTINUE:
                         isCompleted = !shouldContinue();
                         final boolean lastIteration = iteration == maxIterations;
-                        final boolean shouldDefer = !isCompleted && (result == IterationResult.NOT_YET
-                          || result == IterationResult.SENDING_BUFFER_FULL
-                          || lastIteration);
+                        final boolean shouldDefer = !isCompleted && lastIteration;
+                        logger.trace("executor state -> iterations: {} isCompleted? {} shouldDefer? {}", count++,
+                          isCompleted, shouldDefer);
                         if (shouldDefer) {
                           queue.offer(this);
                           return;
                         }
-                        logger.warn("executor state -> iterations: {} isCompleted? {} shouldDefer? {}", count++,
-                          isCompleted, shouldDefer);
                         break;
                       case COMPLETED:
                         isCompleted = true;
@@ -375,8 +365,20 @@ public class FragmentExecutor implements Runnable {
                     fail(ex);
                     isCompleted = true;
                   } finally {
-                    if (isCompleted) {
-                      onComplete();
+                    if (isCompleted && !tryComplete()) {
+                      pendingCompletion = true;
+                      final Runnable completingTask = this;
+                      fragmentContext.runWhenSendComplete(new FragmentContext.SendCompleteListener() {
+                        @Override
+                        public void sendComplete() {
+                          if (cleaned.compareAndSet(false, true)) { // make sure this is only run once
+                            queue.offer(FIFOTask.of(completingTask, fragmentHandle));
+                            logger.trace("send completed, ready to resume completion of fragment {}",
+                              QueryIdHelper.getQueryIdentifier(fragmentHandle));
+                          }
+                        }
+                      });
+                      logger.trace("waiting for send to complete. backing off...");
                     }
                   }
                 } while (!isCompleted && iteration < maxIterations);
@@ -404,32 +406,24 @@ public class FragmentExecutor implements Runnable {
       fail(e);
     } finally {
       if (!success) {
-        onComplete();
+        boolean completed = tryComplete();
+        Preconditions.checkState(completed, "tryComplete shouldn't return false if the fragment failed starting");
       }
     }
   }
 
-  protected void onComplete() {
-    // no longer allow this thread to be interrupted. We synchronize here to make sure that cancel can't set an
-    // interruption after we have moved beyond this block.
-    final Thread thread;
-    synchronized (myThreadRef) {
-      thread = myThreadRef.get();
-      myThreadRef.set(null);
-      Thread.interrupted();
-    }
-
+  private boolean tryComplete() {
     // We need to sure we countDown at least once. We'll do it here to guarantee that.
     acceptExternalEvents.countDown();
+
+    if (!fragmentContext.isSendComplete()) {
+      return false;
+    }
 
     // here we could be in FAILED, RUNNING, or CANCELLATION_REQUESTED
     cleanup(FragmentState.FINISHED);
 
-    clusterCoordinator.removeDrillbitStatusListener(drillbitStatusListener);
-    if (thread != null) {
-//      thread.setName(originalThreadName);
-    }
-
+    return true;
   }
 
   /**

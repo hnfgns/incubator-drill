@@ -86,7 +86,7 @@ class RequestIdMap {
     final Object old;
     synchronized (map) {
       Preconditions.checkArgument(isOpen.get(),
-          "Attempted to send a message when connection is no longer valid.");
+          "Attempted to send a message when connection is no longer valid: " + connection.getName());
       old = map.put(i, future);
     }
     Preconditions.checkArgument(old == null,

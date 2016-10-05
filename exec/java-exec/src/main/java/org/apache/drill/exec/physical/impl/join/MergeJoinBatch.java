@@ -140,17 +140,12 @@ public class MergeJoinBatch extends AbstractRecordBatch<MergeJoinPOP> {
   @Override
   public boolean buildSchema() {
     // initialize iterators
-    status.initialize();
+    if (!status.initialize()) {
+      return false;
+    }
 
     final IterOutcome leftOutcome = status.getLeftStatus();
-    if (leftOutcome == IterOutcome.NOT_YET) {
-      return false;
-    }
-
     final IterOutcome rightOutcome = status.getRightStatus();
-    if (rightOutcome == IterOutcome.NOT_YET) {
-      return false;
-    }
 
     if (leftOutcome == IterOutcome.STOP || rightOutcome == IterOutcome.STOP) {
       state = BatchState.STOP;
@@ -168,7 +163,10 @@ public class MergeJoinBatch extends AbstractRecordBatch<MergeJoinPOP> {
   @Override
   public IterOutcome innerNext() {
     // we do this in the here instead of the constructor because don't necessary want to start consuming on construction.
-    status.prepare();
+    if (!status.prepare()) {
+      return IterOutcome.NOT_YET;
+    }
+
     // loop so we can start over again if we find a new batch was created.
     while (true) {
       // Check result of last iteration.
